@@ -1,0 +1,29 @@
+{
+  "template": "https://github.com/FAIRmat-NFDI/cookiecutter-nomad-plugin",
+  "commit": "7bfd556fe5c57f6ad5666fe65eed2cf3672f5719",
+  "checkout": null,
+  "context": {
+    "cookiecutter": {
+      "full_name": "Abbas Gholami",
+      "email": "abbas.gholami71@gmail.com",
+      "github_username": "abbasgholami71",
+      "plugin_name": "nomad-em",
+      "module_name": "nomad_em",
+      "short_description": "Nomad example template",
+      "version": "0.1.0",
+      "license": "BSD-3",
+      "include_schema_package": true,
+      "include_normalizer": false,
+      "include_parser": true,
+      "include_app": false,
+      "include_example_uploads": true,
+      "include_action": false,
+      "_copy_without_render": [
+        "*.html"
+      ],
+      "_template": "https://github.com/FAIRmat-NFDI/cookiecutter-nomad-plugin",
+      "_commit": "7bfd556fe5c57f6ad5666fe65eed2cf3672f5719"
+    }
+  },
+  "directory": null
+}
