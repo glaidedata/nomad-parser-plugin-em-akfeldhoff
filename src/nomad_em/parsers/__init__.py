@@ -1,18 +1,12 @@
 from nomad.config.models.plugins import ParserEntryPoint
-from pydantic import Field
 
-
-class NewParserEntryPoint(ParserEntryPoint):
-    parameter: int = Field(0, description='Custom configuration parameter')
-
+class SEMParserEntryPoint(ParserEntryPoint):
     def load(self):
-        from nomad_em.parsers.parser import NewParser
+        from nomad_em.parsers.parser import SEMParser
+        return SEMParser(**self.dict())
 
-        return NewParser(**self.model_dump())
-
-
-parser_entry_point = NewParserEntryPoint(
-    name='NewParser',
-    description='New parser entry point configuration.',
-    mainfile_name_re=r'.*\.newmainfilename',
+parser_entry_point = SEMParserEntryPoint(
+    name='SEMParser',
+    description='Parser for JEOL SEM data (bmp+txt)',
+    mainfile_name_re=r'.*\.txt',
 )
