@@ -22,7 +22,7 @@ class SEMParser(MatchingParser):
         logger: 'BoundLogger',
         child_archives: dict[str, 'EntryArchive'] = None,
     ) -> None:
-        logger.info('SEMParser.parse', parameter=configuration.parameter)
+        logger.info('SEMParser.parse')
 
         # 1. Create the main Entry structure
         sem_entry = SEMEntry()
@@ -30,6 +30,7 @@ class SEMParser(MatchingParser):
 
         # 2. Get the directory of the uploaded file
         mainfile_dir = os.path.dirname(mainfile)
+        # Sort files to ensure deterministic order
         files = sorted(os.listdir(mainfile_dir))
 
         # 3. Loop through all files to find .txt metadata files
@@ -42,8 +43,8 @@ class SEMParser(MatchingParser):
                 if bmp_name not in files:
                     continue  # Skip orphan txt files
 
-                # 4. Parse the text file
-                metadata = self.read_jeol_txt(txt_path)
+                # 4. Parse the text file (Pass the logger here!)
+                metadata = self.read_jeol_txt(txt_path, logger)
 
                 # 5. Populate the SEMImage schema
                 image_section = SEMImage()
@@ -74,7 +75,7 @@ class SEMParser(MatchingParser):
         # 6. Store the populated entry into the archive
         archive.data = sem_entry
 
-    def read_jeol_txt(self, filepath):
+    def read_jeol_txt(self, filepath, logger=None):
         """
         Reads the JEOL SEM txt file.
         """
@@ -85,15 +86,15 @@ class SEMParser(MatchingParser):
                     line_content = line.strip()
                     if not line_content:
                         continue
-
                     # Split by first space
                     parts = line_content.split(' ', 1)
-
-                    n_parts = 2
-                    if len(parts) == n_parts:
+                    if len(parts) == 2:  # noqa: PLR2004
                         key = parts[0].strip()
                         value = parts[1].strip()
                         data[key] = value
         except Exception as e:
-            print(f'Error reading {filepath}: {e}')
+            if logger:
+                logger.error(f'Error reading {filepath}: {e}')
+            else:
+                print(f'Error reading {filepath}: {e}')
         return data
