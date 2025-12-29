@@ -3,7 +3,7 @@ import os
 
 from nomad.datamodel import EntryArchive
 
-from nomad_em_parser_akfeldhoff.parsers.parser import SEMParser
+from nomad_em_parser_akfeldhoff.parsers.sem_parser import SEMParser
 
 # Define constants
 EXPECTED_VOLTAGE = 20.0

@@ -3,7 +3,7 @@ from nomad.config.models.plugins import ParserEntryPoint
 
 class SEMParserEntryPoint(ParserEntryPoint):
     def load(self):
-        from nomad_em_parser_akfeldhoff.parsers.parser import SEMParser
+        from nomad_em_parser_akfeldhoff.parsers.sem_parser import SEMParser
 
         return SEMParser(**self.dict())
 
