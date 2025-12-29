@@ -173,7 +173,9 @@ class SEMSettings(ArchiveSection):
         a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),
     )
     stage_position = SubSection(
-        section_def=SEMStagePosition, description='Stage position during acquisition.'
+        section_def=SEMStagePosition,
+        description='Stage position during acquisition.',
+        a_eln=ELNAnnotation(overview=True),
     )
 
 
@@ -271,7 +273,7 @@ class SEMEntry(EntryData):
         a_eln=ELNAnnotation(
             label='SEM Experiment (JEOL)',
             properties=SectionProperties(
-                order=['instrument', 'settings', 'images', 'description'],
+                order=['name', 'instrument', 'settings', 'images', 'description'],
                 overview=True,
                 lane_width='600px',
             ),
