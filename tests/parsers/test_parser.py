@@ -52,22 +52,24 @@ def test_sem_parser():
     assert image_data.signal == 'LEI'
     assert image_data.date == '10/29/2025'
     assert image_data.time == '9:33:41 AM'
-    assert image_data.image_resolution == '1280x1024'
-    assert image_data.scan_speed == 735.0
-    assert image_data.scan_average == 1.0
-    assert image_data.emission == 10.0
-    assert image_data.probe_current == 'C4 F0'
-    assert image_data.stage_position is not None
-    assert image_data.stage_position.x.magnitude == pytest.approx(37.1761)
-    assert image_data.stage_position.x.units == 'millimeter'
-    assert image_data.stage_position.y.magnitude == pytest.approx(44.9344)
-    assert image_data.stage_position.y.units == 'millimeter'
-    assert image_data.stage_position.r.magnitude == pytest.approx(354.9968)
-    assert image_data.stage_position.r.units == 'degree'
-    assert image_data.stage_position.z.magnitude == pytest.approx(16.90)
-    assert image_data.stage_position.z.units == 'millimeter'
-    assert image_data.stage_position.t.magnitude == pytest.approx(0.0)
-    assert image_data.stage_position.t.units == 'degree'
+    settings = sem_entry.settings
+    assert settings is not None
+    assert settings.image_resolution == '1280x1024'
+    assert settings.scan_speed == 735.0
+    assert settings.scan_average == 1.0
+    assert settings.emission == 10.0
+    assert settings.probe_current == 'C4 F0'
+    assert settings.stage_position is not None
+    assert settings.stage_position.x.magnitude == pytest.approx(37.1761)
+    assert settings.stage_position.x.units == 'millimeter'
+    assert settings.stage_position.y.magnitude == pytest.approx(44.9344)
+    assert settings.stage_position.y.units == 'millimeter'
+    assert settings.stage_position.r.magnitude == pytest.approx(354.9968)
+    assert settings.stage_position.r.units == 'degree'
+    assert settings.stage_position.z.magnitude == pytest.approx(16.90)
+    assert settings.stage_position.z.units == 'millimeter'
+    assert settings.stage_position.t.magnitude == pytest.approx(0.0)
+    assert settings.stage_position.t.units == 'degree'
 
     assert instrument is not None
     assert instrument.name == 'JSM 6700F NT'

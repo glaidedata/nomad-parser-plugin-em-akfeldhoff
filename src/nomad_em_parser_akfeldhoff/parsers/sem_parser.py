@@ -13,6 +13,7 @@ from nomad_em_parser_akfeldhoff.schema_packages.sem import (
     SEMEntry,
     SEMImage,
     SEMInstrument,
+    SEMSettings,
     SEMStagePosition,
 )
 
@@ -35,36 +36,31 @@ class SEMParser(MatchingParser):
         sem_entry = SEMEntry()
         sem_entry.images = []
 
-        # 2. Get the directory of the uploaded file
         mainfile_dir = os.path.dirname(mainfile)
-        # Sort files to ensure deterministic order
-        files = sorted(os.listdir(mainfile_dir))
+        mainfile_name = os.path.basename(mainfile)
+        if not mainfile_name.endswith('.txt'):
+            logger.warning('SEMParser: mainfile is not a .txt, skipping', mainfile=mainfile)
+            return
 
-        # 3. Loop through all files to find .txt metadata files with JEOL SEM signature
-        for filename in files:
-            if filename.endswith('.txt'):
-                txt_path = os.path.join(mainfile_dir, filename)
+        # Parse the mainfile text
+        metadata = self.read_jeol_txt(mainfile, logger)
 
-                # Check if a matching .bmp exists (same name, different extension)
-                bmp_name = filename.replace('.txt', '.bmp')
-                if bmp_name not in files:
-                    continue  # Skip orphan txt files
+        # Populate instrument and settings
+        instrument_section = self.build_instrument(metadata)
+        if instrument_section is not None:
+            sem_entry.instrument = instrument_section
+        settings_section = self.build_settings(metadata)
+        if settings_section is not None:
+            sem_entry.settings = settings_section
 
-                # 4. Parse the text file (Pass the logger here!)
-                metadata = self.read_jeol_txt(txt_path, logger)
-
-                # Populate instrument info once
-                if sem_entry.instrument is None:
-                    instrument_section = self.build_instrument(metadata)
-                    if instrument_section is not None:
-                        sem_entry.instrument = instrument_section
-
-                # 5. Populate the SEMImage schema
-                bmp_path = os.path.join(mainfile_dir, bmp_name)
-                image_section = self.build_image_section(
-                    metadata, bmp_name, bmp_path, archive, mainfile_dir
-                )
-                sem_entry.images.append(image_section)
+        # Attach the matching BMP (same basename)
+        bmp_name = mainfile_name.replace('.txt', '.bmp')
+        bmp_path = os.path.join(mainfile_dir, bmp_name)
+        if os.path.exists(bmp_path):
+            image_section = self.build_image_section(
+                metadata, bmp_name, bmp_path, archive, mainfile_dir
+            )
+            sem_entry.images.append(image_section)
 
         # 6. Store the populated entry into the archive
         archive.data = sem_entry
@@ -118,6 +114,52 @@ class SEMParser(MatchingParser):
         instrument_section.operator = metadata.get('$CM_OPERATOR')
         return instrument_section
 
+    def build_settings(self, metadata: dict[str, str]) -> SEMSettings | None:
+        """
+        Build the settings section from metadata (set once per entry).
+        """
+        has_settings = any(
+            key in metadata
+            for key in (
+                '$$SM_DISPLAY_MODE',
+                '$$SM_COLUMN_MODE',
+                '$CM_IMAGE_RES',
+                '$CM_SCAN_SPEED',
+                '$CM_SCAN_AVERAGE',
+                '$CM_PROBE_CURRENT',
+                '$CM_EMISSION',
+                '$SM_GB_GUN_VOLT',
+                '$SM_GB_BIAS_VOLT',
+                '$SM_COLUM_ECP_ANGLE',
+                '$CM_STAGE_POSITION',
+            )
+        )
+        if not has_settings:
+            return None
+
+        settings = SEMSettings()
+        settings.display_mode = metadata.get('$$SM_DISPLAY_MODE')
+        settings.column_mode = metadata.get('$$SM_COLUMN_MODE')
+        settings.sei_detector_mode = self._to_float(metadata.get('$$SM_SEI_DETECTOR_MODE'))
+        settings.sei_detector_level = self._to_float(metadata.get('$$SM_SEI_DETECTOR_LEVEL'))
+        settings.image_resolution = metadata.get('$CM_IMAGE_RES')
+        settings.scan_angle = metadata.get('$CM_SCAN_ANGLE')
+        settings.scan_speed = self._to_float(metadata.get('$CM_SCAN_SPEED'))
+        settings.scan_average = self._to_float(metadata.get('$CM_SCAN_AVERAGE'))
+        settings.probe_current = metadata.get('$CM_PROBE_CURRENT')
+        settings.emission = self._to_float(metadata.get('$CM_EMISSION'))
+        settings.gun_voltage = self._to_float(metadata.get('$SM_GB_GUN_VOLT'))
+        settings.bias_voltage = self._to_float(metadata.get('$SM_GB_BIAS_VOLT'))
+        settings.column_ecp_angle = self._to_float(metadata.get('$SM_COLUM_ECP_ANGLE'))
+
+        stage_position_raw = metadata.get('$CM_STAGE_POSITION')
+        if stage_position_raw:
+            stage = self._parse_stage_position(stage_position_raw)
+            if stage is not None:
+                settings.stage_position = stage
+
+        return settings
+
     def build_image_section(
         self,
         metadata: dict[str, str],
@@ -140,11 +182,7 @@ class SEMParser(MatchingParser):
         image_section.title = metadata.get('$CM_TITLE')
         image_section.date = metadata.get('$CM_DATE')
         image_section.time = metadata.get('$CM_TIME')
-        image_section.operator = metadata.get('$CM_OPERATOR')
-        image_section.company = metadata.get('$CM_COMPANY')
         image_section.image_id = metadata.get('$CM_IMAGEID', '').lstrip(': ').strip()
-        image_section.instrument_type = metadata.get('$CM_INSTRUMENT_TYPE')
-        image_section.instrument_name = metadata.get('$CM_INSTRUMENT')
 
         # Key numeric parameters
         image_section.signal = metadata.get('$CM_SIGNAL')
@@ -175,25 +213,6 @@ class SEMParser(MatchingParser):
         image_section.sei_detector_level = self._to_float(
             metadata.get('$$SM_SEI_DETECTOR_LEVEL')
         )
-
-        image_section.gun_voltage = self._to_float(metadata.get('$SM_GB_GUN_VOLT'))
-        image_section.bias_voltage = self._to_float(metadata.get('$SM_GB_BIAS_VOLT'))
-        image_section.column_ecp_angle = self._to_float(
-            metadata.get('$SM_COLUM_ECP_ANGLE')
-        )
-
-        image_section.image_resolution = metadata.get('$CM_IMAGE_RES')
-        image_section.scan_angle = metadata.get('$CM_SCAN_ANGLE')
-        image_section.scan_speed = self._to_float(metadata.get('$CM_SCAN_SPEED'))
-        image_section.scan_average = self._to_float(metadata.get('$CM_SCAN_AVERAGE'))
-        image_section.probe_current = metadata.get('$CM_PROBE_CURRENT')
-        image_section.emission = self._to_float(metadata.get('$CM_EMISSION'))
-
-        stage_position_raw = metadata.get('$CM_STAGE_POSITION')
-        if stage_position_raw:
-            stage = self._parse_stage_position(stage_position_raw)
-            if stage is not None:
-                image_section.stage_position = stage
 
         return image_section
 

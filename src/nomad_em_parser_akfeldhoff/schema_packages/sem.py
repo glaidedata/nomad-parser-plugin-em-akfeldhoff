@@ -39,6 +39,37 @@ class SEMStagePosition(ArchiveSection):
     t = Quantity(type=float, unit='deg', description='Stage tilt.')
 
 
+class SEMSettings(ArchiveSection):
+    """
+    Instrument settings captured during acquisition (per entry).
+    """
+
+    display_mode = Quantity(type=str, description='Display mode ($$SM_DISPLAY_MODE).')
+    column_mode = Quantity(type=str, description='Column mode ($$SM_COLUMN_MODE).')
+    sei_detector_mode = Quantity(
+        type=float, description='SEI detector mode ($$SM_SEI_DETECTOR_MODE).'
+    )
+    sei_detector_level = Quantity(
+        type=float, description='SEI detector level ($$SM_SEI_DETECTOR_LEVEL).'
+    )
+    image_resolution = Quantity(type=str, description='Image resolution ($CM_IMAGE_RES).')
+    scan_angle = Quantity(type=str, description='Scan angle ($CM_SCAN_ANGLE).')
+    scan_speed = Quantity(type=float, description='Scan speed ($CM_SCAN_SPEED).')
+    scan_average = Quantity(type=float, description='Scan average ($CM_SCAN_AVERAGE).')
+    probe_current = Quantity(
+        type=str, description='Probe current configuration ($CM_PROBE_CURRENT).'
+    )
+    emission = Quantity(type=float, description='Emission current ($CM_EMISSION).')
+    gun_voltage = Quantity(type=float, description='Gun voltage ($SM_GB_GUN_VOLT).')
+    bias_voltage = Quantity(type=float, description='Bias voltage ($SM_GB_BIAS_VOLT).')
+    column_ecp_angle = Quantity(
+        type=float, description='Column ECP angle ($SM_COLUM_ECP_ANGLE).'
+    )
+    stage_position = SubSection(
+        section_def=SEMStagePosition, description='Stage position during acquisition.'
+    )
+
+
 class SEMImage(ArchiveSection):
     """
     Section representing a single SEM image and its extracted metadata.
@@ -49,15 +80,7 @@ class SEMImage(ArchiveSection):
     comment = Quantity(type=str, description='Comment ($CM_COMMENT).')
     title = Quantity(type=str, description='Title ($CM_TITLE).')
     time = Quantity(type=str, description='Acquisition time ($CM_TIME).')
-    operator = Quantity(type=str, description='Operator recorded for the image.')
-    company = Quantity(type=str, description='Company recorded for the image.')
     image_id = Quantity(type=str, description='Image identifier ($CM_IMAGEID).')
-    instrument_type = Quantity(
-        type=str, description='Instrument type reported with the image.'
-    )
-    instrument_name = Quantity(
-        type=str, description='Instrument name reported with the image.'
-    )
 
     image = Quantity(
         type=str,
@@ -111,31 +134,6 @@ class SEMImage(ArchiveSection):
     font_size = Quantity(
         type=str, description='Font size settings ($$SM_FONT_SIZE).'
     )
-    display_mode = Quantity(type=str, description='Display mode ($$SM_DISPLAY_MODE).')
-    column_mode = Quantity(type=str, description='Column mode ($$SM_COLUMN_MODE).')
-    sei_detector_mode = Quantity(
-        type=float, description='SEI detector mode ($$SM_SEI_DETECTOR_MODE).'
-    )
-    sei_detector_level = Quantity(
-        type=float, description='SEI detector level ($$SM_SEI_DETECTOR_LEVEL).'
-    )
-    gun_voltage = Quantity(type=float, description='Gun voltage ($SM_GB_GUN_VOLT).')
-    bias_voltage = Quantity(type=float, description='Bias voltage ($SM_GB_BIAS_VOLT).')
-    column_ecp_angle = Quantity(
-        type=float, description='Column ECP angle ($SM_COLUM_ECP_ANGLE).'
-    )
-    image_resolution = Quantity(type=str, description='Image resolution ($CM_IMAGE_RES).')
-    scan_angle = Quantity(type=str, description='Scan angle ($CM_SCAN_ANGLE).')
-    scan_speed = Quantity(type=float, description='Scan speed ($CM_SCAN_SPEED).')
-    scan_average = Quantity(type=float, description='Scan average ($CM_SCAN_AVERAGE).')
-    probe_current = Quantity(
-        type=str, description='Probe current configuration ($CM_PROBE_CURRENT).'
-    )
-    emission = Quantity(type=float, description='Emission current ($CM_EMISSION).')
-
-    stage_position = SubSection(
-        section_def=SEMStagePosition, description='Stage position during acquisition.'
-    )
 
 
 class SEMEntry(EntryData):
@@ -156,10 +154,14 @@ class SEMEntry(EntryData):
     )
 
     # This SubSection holds the list of images found in the folder
-    images = SubSection(section_def=SEMImage, repeats=True, label='Detected Images')
+    images = SubSection(section_def=SEMImage, repeats=True, label='images')
     instrument = SubSection(
         section_def=SEMInstrument,
         description='Instrument metadata captured from the JEOL txt.',
+    )
+    settings = SubSection(
+        section_def=SEMSettings,
+        description='Instrument settings captured from the JEOL txt.',
     )
 
     def normalize(self, archive, logger):
