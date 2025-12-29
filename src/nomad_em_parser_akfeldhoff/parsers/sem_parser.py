@@ -61,7 +61,10 @@ class SEMParser(MatchingParser):
                         sem_entry.instrument = instrument_section
 
                 # 5. Populate the SEMImage schema
-                image_section = self.build_image_section(metadata, bmp_name)
+                bmp_path = os.path.join(mainfile_dir, bmp_name)
+                image_section = self.build_image_section(
+                    metadata, bmp_name, bmp_path, archive
+                )
                 sem_entry.images.append(image_section)
 
         # 6. Store the populated entry into the archive
@@ -117,13 +120,13 @@ class SEMParser(MatchingParser):
         return instrument_section
 
     def build_image_section(
-        self, metadata: dict[str, str], bmp_name: str
+        self, metadata: dict[str, str], bmp_name: str, bmp_path: str, archive
     ) -> SEMImage:
         """
         Map metadata to the SEMImage schema, including raw key/value pairs.
         """
         image_section = SEMImage()
-        image_section.image = bmp_name
+        image_section.image = self._raw_file_reference(bmp_path, archive) or bmp_name
 
         image_section.format = metadata.get('$CM_FORMAT')
         image_section.version = metadata.get('$CM_VERSION')
@@ -244,3 +247,16 @@ class SEMParser(MatchingParser):
             found = True
 
         return stage_section if found else None
+
+    @staticmethod
+    def _raw_file_reference(file_path: str, archive) -> str | None:
+        """
+        Return a path relative to the upload root if available so the GUI can render the file.
+        """
+        raw_path = getattr(getattr(archive, 'm_context', None), 'raw_path', None)
+        if raw_path:
+            try:
+                return os.path.relpath(file_path, raw_path)
+            except Exception:
+                pass
+        return os.path.basename(file_path)

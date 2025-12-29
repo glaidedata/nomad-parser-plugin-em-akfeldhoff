@@ -72,8 +72,11 @@ class SEMImage(ArchiveSection):
         type=str,
         description='The image file (.bmp) associated with this metadata.',
         a_eln=ELNAnnotation(
-            component=ELNComponentEnum.FileEditQuantity, label='SEM Image'
+            component=ELNComponentEnum.FileEditQuantity,
+            label='SEM Image',
+            overview=True,
         ),
+        a_browser=dict(adaptor='RawFileAdaptor', label='SEM image'),
     )
 
     acceleration_voltage = Quantity(
