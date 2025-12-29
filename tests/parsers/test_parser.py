@@ -85,3 +85,4 @@ def test_sem_parser():
     assert 'SEM' in eln.methods
     assert 'JSM 6700F NT' in eln.instruments
     assert any('20 kV' in desc for desc in eln.descriptions)
+    assert eln.names is not None and len(eln.names) > 0
