@@ -33,7 +33,7 @@ class SEMParser(MatchingParser):
         # Sort files to ensure deterministic order
         files = sorted(os.listdir(mainfile_dir))
 
-        # 3. Loop through all files to find .txt metadata files
+        # 3. Loop through all files to find .txt metadata files with JEOL SEM signature
         for filename in files:
             if filename.endswith('.txt'):
                 txt_path = os.path.join(mainfile_dir, filename)

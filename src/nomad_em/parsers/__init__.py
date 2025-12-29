@@ -11,5 +11,6 @@ class SEMParserEntryPoint(ParserEntryPoint):
 parser_entry_point = SEMParserEntryPoint(
     name='SEMParser',
     description='Parser for JEOL SEM data (bmp+txt)',
-    mainfile_name_re=r'.*\.txt',
+    mainfile_name_re=r'.*\.txt$',
+    mainfile_contents_re=r'(?ms)(?=.*^\$CM_FORMAT\s+Bitmap)(?=.*^\$CM_VERSION\b)',
 )
