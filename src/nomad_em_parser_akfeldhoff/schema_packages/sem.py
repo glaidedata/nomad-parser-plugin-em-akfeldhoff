@@ -39,15 +39,6 @@ class SEMStagePosition(ArchiveSection):
     t = Quantity(type=float, unit='deg', description='Stage tilt.')
 
 
-class KeyValueMetadata(ArchiveSection):
-    """
-    Raw key/value metadata captured from the JEOL txt file.
-    """
-
-    key = Quantity(type=str, description='Metadata key from JEOL txt.')
-    value = Quantity(type=str, description='Metadata value from JEOL txt.')
-
-
 class SEMImage(ArchiveSection):
     """
     Section representing a single SEM image and its extracted metadata.
@@ -138,10 +129,6 @@ class SEMImage(ArchiveSection):
 
     stage_position = SubSection(
         section_def=SEMStagePosition, description='Stage position during acquisition.'
-    )
-
-    metadata = SubSection(
-        section_def=KeyValueMetadata, repeats=True, description='Raw metadata pairs.'
     )
 
 

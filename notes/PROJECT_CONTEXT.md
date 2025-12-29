@@ -6,8 +6,8 @@ This project is a NOMAD parser plugin for JEOL SEM data, designed to work within
 ## Key Features
 - **Parser for JEOL SEM data**: Detects and parses .txt metadata files with JEOL SEM format, and associates them with corresponding .bmp image files.
 - **Batch Processing**: Scans the entire upload directory for all valid txt+bmp pairs, not just the mainfile.
-- **Metadata Extraction**: Extracts the full set of key-value metadata from the JEOL txt, including voltages, magnification, working distance, signal, scan settings, detector settings, stage position, etc. Empty values are preserved.
-- **Schema Structure**: Stores results in a top-level `SEMEntry` with instrument info, a list of `SEMImage` sections (metadata plus raw key/value pairs), stage position, and the BMP image reference (displayable via RawFileAdaptor).
+- **Metadata Extraction**: Extracts the full set of key-value metadata from the JEOL txt, including voltages, magnification, working distance, signal, scan settings, detector settings, stage position, etc. Empty values are preserved for mapped fields.
+- **Schema Structure**: Stores results in a top-level `SEMEntry` with instrument info, a list of `SEMImage` sections (typed metadata only), stage position, and the BMP image reference (displayable via RawFileAdaptor).
 - **NOMAD Plugin Integration**: Registered as a parser entry point for the NOMAD platform, using the `ParserEntryPoint` interface.
 - **Overview Metadata**: `SEMEntry.normalize` populates `results.eln` (sections, methods, instruments, names, descriptions) so key sample and instrument info appears on the overview page. Images are marked for overview display.
 
@@ -22,7 +22,7 @@ This project is a NOMAD parser plugin for JEOL SEM data, designed to work within
 ## Parser Logic
 - **Mainfile Matching**: Triggers on any `.txt` file, but only processes those with JEOL SEM signature (`$CM_FORMAT Bitmap` and `$CM_VERSION` in the first lines).
 - **Directory Scan**: For each valid .txt file, checks for a matching .bmp file (same basename).
-- **Metadata Parsing**: Reads all key-value pairs from the .txt file, mapping specific keys to typed schema fields and storing all raw pairs.
+- **Metadata Parsing**: Reads all key-value pairs from the .txt file, mapping specific keys to typed schema fields (no raw key/value duplicates stored).
 - **Data Storage**: Populates `archive.data.images[]` with `SEMImage` objects (including a RawFileAdaptor image reference) and sets `archive.data.instrument` from the txt.
 - **Overview Population**: Parser calls `SEMEntry.normalize` to fill `results.eln` (sections, methods, instruments, names, descriptions) so overview cards show sample/instrument summaries.
 

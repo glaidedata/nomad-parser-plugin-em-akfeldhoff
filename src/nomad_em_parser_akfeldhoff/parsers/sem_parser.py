@@ -10,7 +10,6 @@ from nomad.parsing.parser import MatchingParser
 from nomad.units import ureg
 
 from nomad_em_parser_akfeldhoff.schema_packages.sem import (
-    KeyValueMetadata,
     SEMEntry,
     SEMImage,
     SEMInstrument,
@@ -188,14 +187,6 @@ class SEMParser(MatchingParser):
             stage = self._parse_stage_position(stage_position_raw)
             if stage is not None:
                 image_section.stage_position = stage
-
-        # Persist all raw metadata pairs
-        image_section.metadata = []
-        for key, value in metadata.items():
-            kv = KeyValueMetadata()
-            kv.key = key
-            kv.value = value
-            image_section.metadata.append(kv)
 
         return image_section
 

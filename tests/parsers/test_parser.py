@@ -75,45 +75,6 @@ def test_sem_parser():
     assert instrument.company == 'UNI-H-PCI'
     assert instrument.operator == 'GENERAL'
 
-    expected_keys = {
-        '$$SM_COLUMN_MODE',
-        '$$SM_DISPLAY_MODE',
-        '$$SM_FILM_NUMBER',
-        '$$SM_FONT_SIZE',
-        '$$SM_MICRON_BAR',
-        '$$SM_MICRON_MARKER',
-        '$$SM_SEI_DETECTOR_LEVEL',
-        '$$SM_SEI_DETECTOR_MODE',
-        '$$SM_WD',
-        '$CM_ACCEL_VOLT',
-        '$CM_COMMENT',
-        '$CM_COMPANY',
-        '$CM_DATE',
-        '$CM_EMISSION',
-        '$CM_FORMAT',
-        '$CM_IMAGEID',
-        '$CM_IMAGE_RES',
-        '$CM_INSTRUMENT',
-        '$CM_INSTRUMENT_TYPE',
-        '$CM_MAG',
-        '$CM_OPERATOR',
-        '$CM_PROBE_CURRENT',
-        '$CM_SCAN_ANGLE',
-        '$CM_SCAN_AVERAGE',
-        '$CM_SCAN_SPEED',
-        '$CM_SIGNAL',
-        '$CM_STAGE_POSITION',
-        '$CM_TIME',
-        '$CM_TITLE',
-        '$CM_VERSION',
-        '$SM_COLUM_ECP_ANGLE',
-        '$SM_GB_BIAS_VOLT',
-        '$SM_GB_GUN_VOLT',
-    }
-    parsed_keys = {kv.key for kv in image_data.metadata}
-    assert parsed_keys == expected_keys
-    assert len(image_data.metadata) == len(expected_keys)
-
     # Overview data populated in results.eln
     assert archive.results is not None
     assert archive.results.eln is not None
