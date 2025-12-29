@@ -74,20 +74,26 @@ class SEMImage(ArchiveSection):
         type=float,
         unit='kV',
         description='Acceleration Voltage ($CM_ACCEL_VOLT)',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.NumberEditQuantity, overview=True
+        ),
     )
 
     magnification = Quantity(
         type=float,
         description='Magnification ($CM_MAG)',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.NumberEditQuantity, overview=True
+        ),
     )
 
     working_distance = Quantity(
         type=float,
         unit='mm',
         description='Working Distance ($$SM_WD)',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.NumberEditQuantity, overview=True
+        ),
     )
 
     date = Quantity(
