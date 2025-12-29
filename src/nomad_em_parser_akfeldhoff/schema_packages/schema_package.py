@@ -9,7 +9,7 @@ from nomad.datamodel.metainfo.annotations import ELNAnnotation, ELNComponentEnum
 from nomad.metainfo import Quantity, SchemaPackage, Section, SubSection
 
 configuration = config.get_plugin_entry_point(
-    'nomad_em.schema_packages:schema_package_entry_point'
+    'nomad_em_parser_akfeldhoff.schema_packages:schema_package_entry_point'
 )
 
 m_package = SchemaPackage()

@@ -9,9 +9,11 @@ from nomad.config import config
 from nomad.parsing.parser import MatchingParser
 from nomad.units import ureg
 
-from nomad_em.schema_packages.schema_package import SEMEntry, SEMImage
+from nomad_em_parser_akfeldhoff.schema_packages.schema_package import SEMEntry, SEMImage
 
-configuration = config.get_plugin_entry_point('nomad_em.parsers:parser_entry_point')
+configuration = config.get_plugin_entry_point(
+    'nomad_em_parser_akfeldhoff.parsers:parser_entry_point'
+)
 
 
 class SEMParser(MatchingParser):
