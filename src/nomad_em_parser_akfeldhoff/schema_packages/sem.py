@@ -6,6 +6,7 @@ if TYPE_CHECKING:
 from nomad.config import config
 from nomad.datamodel.data import ArchiveSection, EntryData
 from nomad.datamodel.metainfo.annotations import ELNAnnotation, ELNComponentEnum
+from nomad.datamodel.results import ELN, Results
 from nomad.metainfo import Quantity, SchemaPackage, Section, SubSection
 
 configuration = config.get_plugin_entry_point(
@@ -164,6 +165,71 @@ class SEMEntry(EntryData):
         section_def=SEMInstrument,
         description='Instrument metadata captured from the JEOL txt.',
     )
+
+    def normalize(self, archive, logger):
+        super().normalize(archive, logger)
+
+        # Ensure results.eln exists so the GUI overview can surface sample/instrument info
+        if archive.results is None:
+            archive.results = Results()
+        if archive.results.eln is None:
+            archive.results.eln = ELN()
+
+        eln = archive.results.eln
+        eln.sections = eln.sections or []
+        if self.m_def.name not in eln.sections:
+            eln.sections.append(self.m_def.name)
+
+        eln.methods = eln.methods or []
+        if 'SEM' not in eln.methods:
+            eln.methods.append('SEM')
+
+        if self.instrument and self.instrument.name:
+            eln.instruments = eln.instruments or []
+            if self.instrument.name not in eln.instruments:
+                eln.instruments.append(self.instrument.name)
+
+        primary_image = self.images[0] if self.images else None
+        candidate_name = None
+        for candidate in (
+            getattr(primary_image, 'title', None),
+            getattr(primary_image, 'image_id', None),
+            getattr(primary_image, 'image', None),
+        ):
+            if candidate:
+                candidate_name = candidate
+                break
+        if candidate_name:
+            eln.names = eln.names or []
+            if candidate_name not in eln.names:
+                eln.names.append(candidate_name)
+            if getattr(archive, 'metadata', None) is not None and getattr(
+                archive.metadata, 'entry_name', None
+            ) is None:
+                archive.metadata.entry_name = candidate_name
+
+        summary_bits = []
+        if primary_image:
+            if primary_image.magnification is not None:
+                summary_bits.append(f'{primary_image.magnification:g}x')
+            if primary_image.acceleration_voltage is not None:
+                summary_bits.append(
+                    f'{primary_image.acceleration_voltage.magnitude:g} kV'
+                )
+            if primary_image.working_distance is not None:
+                summary_bits.append(
+                    f'WD {primary_image.working_distance.magnitude:g} mm'
+                )
+            if primary_image.date:
+                summary_bits.append(f'date {primary_image.date}')
+        if self.instrument and self.instrument.operator:
+            summary_bits.append(f'operator {self.instrument.operator}')
+
+        if summary_bits:
+            summary = ', '.join(summary_bits)
+            eln.descriptions = eln.descriptions or []
+            if summary not in eln.descriptions:
+                eln.descriptions.append(summary)
 
 
 m_package.__init_metainfo__()

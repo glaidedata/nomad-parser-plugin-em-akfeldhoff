@@ -113,3 +113,12 @@ def test_sem_parser():
     parsed_keys = {kv.key for kv in image_data.metadata}
     assert parsed_keys == expected_keys
     assert len(image_data.metadata) == len(expected_keys)
+
+    # Overview data populated in results.eln
+    assert archive.results is not None
+    assert archive.results.eln is not None
+    eln = archive.results.eln
+    assert 'SEMEntry' in eln.sections
+    assert 'SEM' in eln.methods
+    assert 'JSM 6700F NT' in eln.instruments
+    assert any('20 kV' in desc for desc in eln.descriptions)

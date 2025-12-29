@@ -66,6 +66,9 @@ class SEMParser(MatchingParser):
 
         # 6. Store the populated entry into the archive
         archive.data = sem_entry
+        # Populate overview-related metadata immediately (normalizer would do this in production)
+        if hasattr(sem_entry, 'normalize'):
+            sem_entry.normalize(archive, logger)
 
     def read_jeol_txt(self, filepath, logger=None):
         """
