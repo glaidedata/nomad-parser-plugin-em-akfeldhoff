@@ -1,15 +1,15 @@
-# nomad-em
+# nomad-em-parser-akfeldhoff
 
-Nomad example template
+A NOMAD parser plugin for JEOL SEM exports (txt + bmp). It detects JEOL `.txt` metadata files, links the matching `.bmp` image, maps instrument/settings/stage metadata into a `SEMEntry`, stores the image reference (RawFileAdaptor) plus a Plotly-based preview, and populates `results.eln` so key info appears in the GUI overview.
 
 This `nomad` plugin was generated with `Cookiecutter` along with `@nomad`'s [`cookiecutter-nomad-plugin`](https://github.com/FAIRmat-NFDI/cookiecutter-nomad-plugin) template.
 
 ## Development
 
-If you want to develop locally this plugin, clone the project and in the plugin folder, create a virtual environment (you can use Python 3.10, 3.11 or 3.12):
+If you want to develop locally this plugin, clone the project and in the plugin folder, create a virtual environment (you can use Python 3.10, 3.11, or 3.12):
 ```sh
-git clone https://github.com/abbasgholami71/nomad-em.git
-cd nomad-em
+git clone https://github.com/FAIRmat-NFDI/nomad-em-parser-akfeldhoff.git
+cd nomad-em-parser-akfeldhoff
 python3.11 -m venv .pyenv
 . .pyenv/bin/activate
 ```
@@ -25,6 +25,14 @@ pip install uv
 ```
 
 Install the `nomad-lab` package:
+```sh
+uv pip install -e '.[dev]'
+```
+
+**Note!**  
+Until an official PyPI NOMAD release with plugin functionality is available, install against the NOMAD distro you use (e.g., as a workspace member in `nomad-distro-dev`).
+
+The plugin is under active development. If you would like to contribute, install the package in editable mode (with the added `-e` flag):
 ```sh
 uv pip install -e '.[dev]'
 ```
@@ -96,7 +104,7 @@ mkdocs serve
 
 ## Adding this plugin to NOMAD
 
-Currently, NOMAD has two distinct flavors that are relevant depending on your role as an user:
+Currently, NOMAD has two distinct flavors that are relevant depending on your role as a user:
 1. [A NOMAD Oasis](#adding-this-plugin-in-your-nomad-oasis): any user with a NOMAD Oasis instance.
 2. [Local NOMAD installation and the source code of NOMAD](#adding-this-plugin-in-your-local-nomad-installation-and-the-source-code-of-nomad): internal developers.
 
@@ -106,13 +114,49 @@ Read the [NOMAD plugin documentation](https://nomad-lab.eu/prod/v1/staging/docs/
 
 ### Adding this plugin in your local NOMAD installation and the source code of NOMAD
 
-We now recommend using the dedicated [`nomad-distro-dev`](https://github.com/FAIRmat-NFDI/nomad-distro-dev) repository to simplify the process. Please refer to that repository for detailed instructions.
+Modify the text file under `/nomad/default_plugins.txt` and add:
+```sh
+<other-content-in-default_plugins.txt>
+nomad-em-parser-akfeldhoff==x.y.z
+```
+where `x.y.z` represents the released version of this plugin.
+
+Then, go to your NOMAD folder, activate your NOMAD virtual environment and run:
+```sh
+deactivate
+cd <route-to-NOMAD-folder>/nomad
+source .pyenv/bin/activate
+./scripts/setup_dev_env.sh
+```
+
+Alternatively and only valid for your local NOMAD installation, you can modify `nomad.yaml` to include this plugin, see [NOMAD Oasis - Install plugins](https://nomad-lab.eu/prod/v1/staging/docs/howto/oasis/plugins_install.html).
+
+### Build the python package
+
+The `pyproject.toml` file contains everything that is necessary to turn the project
+into a pip installable python package. Run the python build tool to create a package distribution:
+
+```sh
+pip install build
+python -m build --sdist
+```
+
+You can install the package with pip:
+
+```sh
+pip install dist/nomad-em-parser-akfeldhoff-0.0.0
+```
+
+Read more about python packages, `pyproject.toml`, and how to upload packages to PyPI
+on the [PyPI documentation](https://packaging.python.org/en/latest/tutorials/packaging-projects/).
 
 ### Template update
 
-We use [`cruft`](https://github.com/cruft/cruft) to update the project based on template changes. To run the check for updates locally, run `cruft update` in the root of the project. More details see the instructions on [`cruft` website](https://cruft.github.io/cruft/#updating-a-project).
+We use cruft to update the project based on template changes. A `cruft-update.yml` is included in Github workflows to automatically check for updates and create pull requests to apply updates. Follow the [instructions](https://github.blog/changelog/2022-05-03-github-actions-prevent-github-actions-from-creating-and-approving-pull-requests/) on how to enable Github Actions to create pull requests. 
+
+To run the check for updates locally, follow the instructions on [`cruft` website](https://cruft.github.io/cruft/#updating-a-project).
 
 ## Main contributors
 | Name | E-mail     |
 |------|------------|
-| Abbas Gholami | [abbas.gholami71@gmail.com](mailto:abbas.gholami71@gmail.com)
+| Glaide Data GmbH | [info@glaidedata.com](mailto:info@glaidedata.com)
