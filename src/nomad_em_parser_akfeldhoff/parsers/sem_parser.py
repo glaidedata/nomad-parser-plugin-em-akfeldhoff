@@ -1,3 +1,5 @@
+import base64
+import io
 import os
 from typing import TYPE_CHECKING
 
@@ -8,10 +10,13 @@ if TYPE_CHECKING:
 from nomad.config import config
 from nomad.parsing.parser import MatchingParser
 from nomad.units import ureg
+from PIL import Image
+from nomad.datamodel.metainfo.plot import PlotlyFigure
 
 from nomad_em_parser_akfeldhoff.schema_packages.sem import (
     SEMEntry,
     SEMImage,
+    SEMImagePlot,
     SEMInstrument,
     SEMSettings,
     SEMStagePosition,
@@ -214,6 +219,10 @@ class SEMParser(MatchingParser):
             metadata.get('$$SM_SEI_DETECTOR_LEVEL')
         )
 
+        plot_section = self._build_image_plot(bmp_path)
+        if plot_section is not None:
+            image_section.plot = plot_section
+
         return image_section
 
     @staticmethod
@@ -280,3 +289,48 @@ class SEMParser(MatchingParser):
             return os.path.relpath(file_path, base_dir)
         except Exception:
             return os.path.basename(file_path)
+
+    @staticmethod
+    def _build_image_plot(file_path: str) -> SEMImagePlot | None:
+        """
+        Build a Plotly image figure from the BMP so the GUI can render it without relying
+        solely on RawFileAdaptor.
+        """
+        try:
+            with Image.open(file_path) as img:
+                rgb = img.convert('RGB')
+                buf = io.BytesIO()
+                rgb.save(buf, format='PNG')
+                data_uri = (
+                    'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode()
+                )
+
+            fig_section = SEMImagePlot()
+            plotly_fig = PlotlyFigure()
+            plotly_fig.label = 'SEM image'
+            plotly_fig.figure = {
+                'data': [],
+                'layout': {
+                    'images': [
+                        {
+                            'source': data_uri,
+                            'xref': 'x',
+                            'yref': 'y',
+                            'x': 0,
+                            'y': 0,
+                            'sizex': 1,
+                            'sizey': 1,
+                            'sizing': 'stretch',
+                            'layer': 'below',
+                        }
+                    ],
+                    'xaxis': {'visible': False, 'range': [0, 1], 'constrain': 'domain'},
+                    'yaxis': {'visible': False, 'range': [1, 0], 'scaleanchor': 'x'},
+                    'margin': {'l': 0, 'r': 0, 't': 0, 'b': 0},
+                },
+            }
+            fig_section.figures = [plotly_fig]
+            return fig_section
+        except Exception as exc:  # pragma: no cover - debug fallback
+            print(f'Failed to build image plot for {file_path}: {exc}')
+            return None

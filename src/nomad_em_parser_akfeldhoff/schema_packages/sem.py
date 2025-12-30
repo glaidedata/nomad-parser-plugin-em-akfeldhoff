@@ -5,11 +5,8 @@ if TYPE_CHECKING:
 
 from nomad.config import config
 from nomad.datamodel.data import ArchiveSection, EntryData
-from nomad.datamodel.metainfo.annotations import (
-    ELNAnnotation,
-    ELNComponentEnum,
-    SectionProperties,
-)
+from nomad.datamodel.metainfo.annotations import ELNAnnotation, ELNComponentEnum
+from nomad.datamodel.metainfo.plot import PlotlyFigure, PlotSection
 from nomad.datamodel.results import ELN, Results
 from nomad.metainfo import Quantity, SchemaPackage, Section, SubSection
 
@@ -27,11 +24,9 @@ class SEMInstrument(ArchiveSection):
 
     m_def = Section(
         a_eln=ELNAnnotation(
-            properties=SectionProperties(
-                order=['name', 'instrument_type', 'company', 'operator'],
-                overview=True,
-                lane_width='400px',
-            )
+            overview=True,
+            order=['name', 'instrument_type', 'company', 'operator'],
+            lane_width='400px',
         )
     )
 
@@ -82,23 +77,21 @@ class SEMSettings(ArchiveSection):
 
     m_def = Section(
         a_eln=ELNAnnotation(
-            properties=SectionProperties(
-                order=[
-                    'display_mode',
-                    'column_mode',
-                    'image_resolution',
-                    'scan_speed',
-                    'scan_average',
-                    'probe_current',
-                    'emission',
-                    'gun_voltage',
-                    'bias_voltage',
-                    'column_ecp_angle',
-                    'stage_position',
-                ],
-                overview=True,
-                lane_width='400px',
-            )
+            overview=True,
+            order=[
+                'display_mode',
+                'column_mode',
+                'image_resolution',
+                'scan_speed',
+                'scan_average',
+                'probe_current',
+                'emission',
+                'gun_voltage',
+                'bias_voltage',
+                'column_ecp_angle',
+                'stage_position',
+            ],
+            lane_width='400px',
         )
     )
 
@@ -179,6 +172,20 @@ class SEMSettings(ArchiveSection):
     )
 
 
+class SEMImagePlot(PlotSection):
+    """
+    Plot wrapper to render the SEM image via Plotly (data URI).
+    """
+
+    m_def = Section(
+        a_eln=ELNAnnotation(
+            overview=True,
+            order=['figures'],
+            lane_width='400px',
+        )
+    )
+
+
 class SEMImage(ArchiveSection):
     """
     Section representing a single SEM image and its extracted metadata.
@@ -186,22 +193,20 @@ class SEMImage(ArchiveSection):
 
     m_def = Section(
         a_eln=ELNAnnotation(
-            properties=SectionProperties(
-                order=[
-                    'image',
-                    'image_id',
-                    'format',
-                    'version',
-                    'signal',
-                    'magnification',
-                    'acceleration_voltage',
-                    'working_distance',
-                    'date',
-                    'time',
-                ],
-                overview=True,
-                lane_width='400px',
-            )
+            overview=True,
+            order=[
+                'image',
+                'image_id',
+                'format',
+                'version',
+                'signal',
+                'magnification',
+                'acceleration_voltage',
+                'working_distance',
+                'date',
+                'time',
+            ],
+            lane_width='400px',
         )
     )
 
@@ -220,7 +225,16 @@ class SEMImage(ArchiveSection):
             label='SEM Image',
             overview=True,
         ),
-        a_browser=dict(adaptor='RawFileAdaptor', label='SEM image'),
+        a_browser=dict(
+            adaptor='RawFileAdaptor',
+            label='SEM image',
+            mime_types=['image/bmp', 'image/png', 'image/jpeg'],
+        ),
+    )
+    plot = SubSection(
+        section_def=SEMImagePlot,
+        description='Image preview plot.',
+        a_eln=ELNAnnotation(overview=True),
     )
 
     acceleration_voltage = Quantity(
@@ -264,7 +278,7 @@ class SEMImage(ArchiveSection):
     font_size = Quantity(type=str, description='Font size settings ($$SM_FONT_SIZE).')
 
 
-class SEMEntry(EntryData):
+class SEMEntry(ArchiveSection):
     """
     Top-level entry for an SEM experiment containing multiple images.
     """
@@ -272,11 +286,9 @@ class SEMEntry(EntryData):
     m_def = Section(
         a_eln=ELNAnnotation(
             label='SEM Experiment (JEOL)',
-            properties=SectionProperties(
-                order=['name', 'instrument', 'settings', 'images', 'description'],
-                overview=True,
-                lane_width='600px',
-            ),
+            overview=True,
+            order=['name', 'description', 'instrument', 'settings', 'images'],
+            lane_width='600px',
         ),
     )
 
@@ -353,7 +365,9 @@ class SEMEntry(EntryData):
                 # strip known image suffixes when using filename as fallback name
                 stripped = (
                     candidate_name.rsplit('.', 1)[0]
-                    if candidate_name.lower().endswith(('.bmp', '.png', '.jpg', '.jpeg'))
+                    if candidate_name.lower().endswith(
+                        ('.bmp', '.png', '.jpg', '.jpeg')
+                    )
                     else candidate_name
                 )
                 self.name = stripped
