@@ -1,9 +1,8 @@
 name: Deploy MkDocs Site
 
 on:
-  push:
-    branches:
-      - main  # Triggers deployment on push to the main branch
+  # Disabled automatic deploys; keep manual trigger available for later use.
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
