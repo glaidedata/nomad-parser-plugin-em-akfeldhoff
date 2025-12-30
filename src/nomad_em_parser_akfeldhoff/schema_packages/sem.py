@@ -4,9 +4,9 @@ if TYPE_CHECKING:
     pass
 
 from nomad.config import config
-from nomad.datamodel.data import ArchiveSection, EntryData
+from nomad.datamodel.data import ArchiveSection
 from nomad.datamodel.metainfo.annotations import ELNAnnotation, ELNComponentEnum
-from nomad.datamodel.metainfo.plot import PlotlyFigure, PlotSection
+from nomad.datamodel.metainfo.plot import PlotSection
 from nomad.datamodel.results import ELN, Results
 from nomad.metainfo import Quantity, SchemaPackage, Section, SubSection
 

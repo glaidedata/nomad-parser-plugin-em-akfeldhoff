@@ -1,4 +1,3 @@
-import io
 import os
 from typing import TYPE_CHECKING
 
@@ -6,12 +5,11 @@ if TYPE_CHECKING:
     from nomad.datamodel.datamodel import EntryArchive
     from structlog.stdlib import BoundLogger
 
-from nomad.config import config
-from nomad.parsing.parser import MatchingParser
-from nomad.units import ureg
 import numpy as np
-from PIL import Image
+from nomad.config import config
 from nomad.datamodel.metainfo.plot import PlotlyFigure
+from nomad.parsing.parser import MatchingParser
+from PIL import Image
 
 from nomad_em_parser_akfeldhoff.schema_packages.sem import (
     SEMEntry,
@@ -44,7 +42,9 @@ class SEMParser(MatchingParser):
         mainfile_dir = os.path.dirname(mainfile)
         mainfile_name = os.path.basename(mainfile)
         if not mainfile_name.endswith('.txt'):
-            logger.warning('SEMParser: mainfile is not a .txt, skipping', mainfile=mainfile)
+            logger.warning(
+                'SEMParser: mainfile is not a .txt, skipping', mainfile=mainfile
+            )
             return
 
         # Parse the mainfile text
@@ -150,8 +150,12 @@ class SEMParser(MatchingParser):
         settings.display_mode = metadata.get('$$SM_DISPLAY_MODE')
         settings.column_mode = metadata.get('$$SM_COLUMN_MODE')
         settings.signal = metadata.get('$CM_SIGNAL')
-        settings.sei_detector_mode = self._to_float(metadata.get('$$SM_SEI_DETECTOR_MODE'))
-        settings.sei_detector_level = self._to_float(metadata.get('$$SM_SEI_DETECTOR_LEVEL'))
+        settings.sei_detector_mode = self._to_float(
+            metadata.get('$$SM_SEI_DETECTOR_MODE')
+        )
+        settings.sei_detector_level = self._to_float(
+            metadata.get('$$SM_SEI_DETECTOR_LEVEL')
+        )
         settings.acceleration_voltage = self._to_float(metadata.get('$CM_ACCEL_VOLT'))
         settings.magnification = self._to_float(metadata.get('$CM_MAG'))
         if '$$SM_WD' in metadata:
@@ -239,7 +243,7 @@ class SEMParser(MatchingParser):
         stage_section = SEMStagePosition()
         found = False
         for part in parts:
-            axis, raw_value = [p.strip() for p in part.split('=', 1)]
+            axis, raw_value = (p.strip() for p in part.split('=', 1))
             value = SEMParser._to_float(raw_value)
             if value is None:
                 continue
