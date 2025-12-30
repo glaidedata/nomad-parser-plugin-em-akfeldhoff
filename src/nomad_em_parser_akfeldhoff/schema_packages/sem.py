@@ -25,7 +25,6 @@ class SEMInstrument(ArchiveSection):
     m_def = Section(
         a_eln=ELNAnnotation(
             overview=True,
-            order=['name', 'instrument_type', 'company', 'operator'],
             lane_width='400px',
         )
     )
@@ -103,15 +102,6 @@ class SEMSettings(ArchiveSection):
     m_def = Section(
         a_eln=ELNAnnotation(
             overview=True,
-            order=[
-                'display_mode',
-                'column_mode',
-                'signal',
-                'acceleration_voltage',
-                'magnification',
-                'working_distance',
-                'image_resolution',
-            ],
             lane_width='400px',
         )
     )
@@ -163,6 +153,14 @@ class SEMSettings(ArchiveSection):
             component=ELNComponentEnum.NumberEditQuantity, overview=True
         ),
     )
+    image_resolution = Quantity(
+        type=str,
+        description='Image resolution ($CM_IMAGE_RES).',
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.StringEditQuantity,
+            overview=True,
+        ),
+    )
     sei_detector_mode = Quantity(
         type=float,
         description='SEI detector mode ($$SM_SEI_DETECTOR_MODE).',
@@ -175,14 +173,6 @@ class SEMSettings(ArchiveSection):
         description='SEI detector level ($$SM_SEI_DETECTOR_LEVEL).',
         a_eln=ELNAnnotation(
             component=ELNComponentEnum.NumberEditQuantity, overview=False
-        ),
-    )
-    image_resolution = Quantity(
-        type=str,
-        description='Image resolution ($CM_IMAGE_RES).',
-        a_eln=ELNAnnotation(
-            component=ELNComponentEnum.StringEditQuantity,
-            overview=True,
         ),
     )
     scan_angle = Quantity(
@@ -256,7 +246,6 @@ class SEMImagePlot(PlotSection):
     m_def = Section(
         a_eln=ELNAnnotation(
             overview=True,
-            order=['figures'],
             lane_width='400px',
         )
     )
@@ -270,29 +259,10 @@ class SEMImage(ArchiveSection):
     m_def = Section(
         a_eln=ELNAnnotation(
             overview=True,
-            order=[
-                'title',
-                'image',
-                'image_id',
-                'comment',
-                'date',
-                'time',
-                'format',
-                'version',
-            ],
             lane_width='400px',
         )
     )
 
-    format = Quantity(type=str, description='Image format identifier ($CM_FORMAT).')
-    version = Quantity(type=str, description='Format version ($CM_VERSION).')
-    comment = Quantity(
-        type=str,
-        description='Comment ($CM_COMMENT).',
-        a_eln=ELNAnnotation(
-            component=ELNComponentEnum.StringEditQuantity, overview=True
-        ),
-    )
     title = Quantity(
         type=str,
         description='Title ($CM_TITLE).',
@@ -300,21 +270,6 @@ class SEMImage(ArchiveSection):
             component=ELNComponentEnum.StringEditQuantity, overview=True
         ),
     )
-    time = Quantity(
-        type=str,
-        description='Acquisition time ($CM_TIME).',
-        a_eln=ELNAnnotation(
-            component=ELNComponentEnum.StringEditQuantity, overview=True
-        ),
-    )
-    image_id = Quantity(
-        type=str,
-        description='Image identifier ($CM_IMAGEID).',
-        a_eln=ELNAnnotation(
-            component=ELNComponentEnum.StringEditQuantity, overview=True
-        ),
-    )
-
     image = Quantity(
         type=str,
         description='The image file (.bmp) associated with this metadata.',
@@ -329,24 +284,45 @@ class SEMImage(ArchiveSection):
             mime_types=['image/bmp', 'image/png', 'image/jpeg'],
         ),
     )
-    plot = SubSection(
-        section_def=SEMImagePlot,
-        description='Image preview plot.',
-        a_eln=ELNAnnotation(overview=True),
+    image_id = Quantity(
+        type=str,
+        description='Image identifier ($CM_IMAGEID).',
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.StringEditQuantity, overview=True
+        ),
     )
-
     date = Quantity(
         type=str,
         description='Date of acquisition ($CM_DATE)',
         a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),
     )
-
+    time = Quantity(
+        type=str,
+        description='Acquisition time ($CM_TIME).',
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.StringEditQuantity, overview=True
+        ),
+    )
+    comment = Quantity(
+        type=str,
+        description='Comment ($CM_COMMENT).',
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.StringEditQuantity, overview=True
+        ),
+    )
+    format = Quantity(type=str, description='Image format identifier ($CM_FORMAT).')
+    version = Quantity(type=str, description='Format version ($CM_VERSION).')
     film_number = Quantity(type=float, description='Film number ($$SM_FILM_NUMBER).')
     micron_bar = Quantity(type=float, description='Micron bar size ($$SM_MICRON_BAR).')
     micron_marker = Quantity(
         type=str, description='Micron marker label ($$SM_MICRON_MARKER).'
     )
     font_size = Quantity(type=str, description='Font size settings ($$SM_FONT_SIZE).')
+    plot = SubSection(
+        section_def=SEMImagePlot,
+        description='Image preview plot.',
+        a_eln=ELNAnnotation(overview=True),
+    )
 
 
 class SEMEntry(ArchiveSection):
@@ -358,7 +334,6 @@ class SEMEntry(ArchiveSection):
         a_eln=ELNAnnotation(
             label='SEM Experiment (JEOL)',
             overview=True,
-            order=['name', 'lab_id', 'description', 'instrument', 'settings', 'images'],
             lane_width='600px',
         ),
     )
@@ -377,7 +352,6 @@ class SEMEntry(ArchiveSection):
             component=ELNComponentEnum.StringEditQuantity, overview=True
         ),
     )
-
     description = Quantity(
         type=str,
         description='Description of this SEM collection.',
