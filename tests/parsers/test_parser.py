@@ -10,9 +10,11 @@ from nomad_em_parser_akfeldhoff.parsers.sem_parser import SEMParser
 EXPECTED_VOLTAGE = 20.0
 EXPECTED_MAGNIFICATION = 250.0
 EXPECTED_WD = 15.2
+EXPECTED_SCAN_SPEED = 735.0
+EXPECTED_EMISSION = 10.0
 
 
-def test_sem_parser():
+def test_sem_parser():  # noqa: PLR0915
     # 1. ROBUST PATH CALCULATION
     current_dir = os.path.dirname(os.path.abspath(__file__))
     target_file_path = os.path.join(
@@ -59,9 +61,9 @@ def test_sem_parser():
     assert settings.working_distance.magnitude == EXPECTED_WD
     assert settings.working_distance.units == 'millimeter'
     assert settings.image_resolution == '1280x1024'
-    assert settings.scan_speed == 735.0
+    assert settings.scan_speed == EXPECTED_SCAN_SPEED
     assert settings.scan_average == 1.0
-    assert settings.emission == 10.0
+    assert settings.emission == EXPECTED_EMISSION
     assert settings.probe_current == 'C4 F0'
     assert settings.stage_position is not None
     assert settings.stage_position.x.magnitude == pytest.approx(37.1761)

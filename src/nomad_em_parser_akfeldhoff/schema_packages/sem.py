@@ -379,7 +379,7 @@ class SEMEntry(ArchiveSection):
         a_eln=ELNAnnotation(overview=True),
     )
 
-    def normalize(self, archive, logger):
+    def normalize(self, archive, logger):  # noqa: PLR0912, PLR0915
         super().normalize(archive, logger)
 
         # Ensure results.eln exists so the GUI overview can surface sample/instrument info
