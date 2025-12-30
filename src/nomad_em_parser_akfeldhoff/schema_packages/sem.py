@@ -218,9 +218,8 @@ class SEMImage(ArchiveSection):
                 'format',
                 'version',
                 'signal',
-                'magnification',
-                'acceleration_voltage',
-                'working_distance',
+                'title',
+                'comment',
                 'date',
                 'time',
             ],
@@ -269,23 +268,6 @@ class SEMImage(ArchiveSection):
         section_def=SEMImagePlot,
         description='Image preview plot.',
         a_eln=ELNAnnotation(overview=True),
-    )
-
-    acceleration_voltage = Quantity(
-        type=float,
-        unit='kV',
-        description='Acceleration Voltage ($CM_ACCEL_VOLT)',
-        a_eln=ELNAnnotation(
-            component=ELNComponentEnum.NumberEditQuantity, overview=True
-        ),
-    )
-
-    magnification = Quantity(
-        type=float,
-        description='Magnification ($CM_MAG)',
-        a_eln=ELNAnnotation(
-            component=ELNComponentEnum.NumberEditQuantity, overview=True
-        ),
     )
 
     date = Quantity(
