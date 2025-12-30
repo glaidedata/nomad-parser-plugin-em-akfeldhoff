@@ -1,4 +1,3 @@
-import base64
 import io
 import os
 from typing import TYPE_CHECKING
@@ -10,6 +9,7 @@ if TYPE_CHECKING:
 from nomad.config import config
 from nomad.parsing.parser import MatchingParser
 from nomad.units import ureg
+import numpy as np
 from PIL import Image
 from nomad.datamodel.metainfo.plot import PlotlyFigure
 
@@ -292,7 +292,7 @@ class SEMParser(MatchingParser):
         try:
             with Image.open(file_path) as img:
                 rgb = img.convert('RGB')
-                z = rgb.tolist()  # nested lists of pixel values
+                z = np.asarray(rgb).tolist()  # nested lists of pixel values
 
             fig_section = SEMImagePlot()
             plotly_fig = PlotlyFigure()
