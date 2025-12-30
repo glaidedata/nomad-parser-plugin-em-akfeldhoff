@@ -128,6 +128,7 @@ class SEMParser(MatchingParser):
             for key in (
                 '$$SM_DISPLAY_MODE',
                 '$$SM_COLUMN_MODE',
+                '$CM_SIGNAL',
                 '$CM_ACCEL_VOLT',
                 '$CM_MAG',
                 '$$SM_WD',
@@ -148,6 +149,7 @@ class SEMParser(MatchingParser):
         settings = SEMSettings()
         settings.display_mode = metadata.get('$$SM_DISPLAY_MODE')
         settings.column_mode = metadata.get('$$SM_COLUMN_MODE')
+        settings.signal = metadata.get('$CM_SIGNAL')
         settings.sei_detector_mode = self._to_float(metadata.get('$$SM_SEI_DETECTOR_MODE'))
         settings.sei_detector_level = self._to_float(metadata.get('$$SM_SEI_DETECTOR_LEVEL'))
         settings.acceleration_voltage = self._to_float(metadata.get('$CM_ACCEL_VOLT'))
@@ -198,19 +200,10 @@ class SEMParser(MatchingParser):
         image_section.time = metadata.get('$CM_TIME')
         image_section.image_id = metadata.get('$CM_IMAGEID', '').lstrip(': ').strip()
 
-        image_section.signal = metadata.get('$CM_SIGNAL')
         image_section.film_number = self._to_float(metadata.get('$$SM_FILM_NUMBER'))
         image_section.micron_bar = self._to_float(metadata.get('$$SM_MICRON_BAR'))
         image_section.micron_marker = metadata.get('$$SM_MICRON_MARKER')
         image_section.font_size = metadata.get('$$SM_FONT_SIZE')
-        image_section.display_mode = metadata.get('$$SM_DISPLAY_MODE')
-        image_section.column_mode = metadata.get('$$SM_COLUMN_MODE')
-        image_section.sei_detector_mode = self._to_float(
-            metadata.get('$$SM_SEI_DETECTOR_MODE')
-        )
-        image_section.sei_detector_level = self._to_float(
-            metadata.get('$$SM_SEI_DETECTOR_LEVEL')
-        )
 
         plot_section = self._build_image_plot(bmp_path)
         if plot_section is not None:

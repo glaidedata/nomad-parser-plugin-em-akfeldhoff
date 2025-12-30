@@ -44,7 +44,6 @@ def test_sem_parser():
     assert image_data.image == 'HeOx-1004-sg-sps-900C-15min-polished-01.bmp'
     assert image_data.format == 'Bitmap'
     assert image_data.version == '1.5'
-    assert image_data.signal == 'LEI'
     assert image_data.date == '10/29/2025'
     assert image_data.time == '9:33:41 AM'
     assert image_data.comment == ''
@@ -53,6 +52,7 @@ def test_sem_parser():
 
     settings = sem_entry.settings
     assert settings is not None
+    assert settings.signal == 'LEI'
     assert settings.acceleration_voltage.magnitude == EXPECTED_VOLTAGE
     assert settings.acceleration_voltage.units == 'kilovolt'
     assert settings.magnification == EXPECTED_MAGNIFICATION

@@ -63,11 +63,36 @@ class SEMStagePosition(ArchiveSection):
     Stage coordinates captured during acquisition.
     """
 
-    x = Quantity(type=float, unit='mm', description='Stage X position.')
-    y = Quantity(type=float, unit='mm', description='Stage Y position.')
-    r = Quantity(type=float, unit='deg', description='Stage rotation.')
-    z = Quantity(type=float, unit='mm', description='Stage Z position.')
-    t = Quantity(type=float, unit='deg', description='Stage tilt.')
+    x = Quantity(
+        type=float,
+        unit='mm',
+        description='Stage X position.',
+        a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),
+    )
+    y = Quantity(
+        type=float,
+        unit='mm',
+        description='Stage Y position.',
+        a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),
+    )
+    r = Quantity(
+        type=float,
+        unit='deg',
+        description='Stage rotation.',
+        a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),
+    )
+    z = Quantity(
+        type=float,
+        unit='mm',
+        description='Stage Z position.',
+        a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),
+    )
+    t = Quantity(
+        type=float,
+        unit='deg',
+        description='Stage tilt.',
+        a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),
+    )
 
 
 class SEMSettings(ArchiveSection):
@@ -81,6 +106,7 @@ class SEMSettings(ArchiveSection):
             order=[
                 'display_mode',
                 'column_mode',
+                'signal',
                 'acceleration_voltage',
                 'magnification',
                 'working_distance',
@@ -101,6 +127,14 @@ class SEMSettings(ArchiveSection):
     column_mode = Quantity(
         type=str,
         description='Column mode ($$SM_COLUMN_MODE).',
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.StringEditQuantity,
+            overview=True,
+        ),
+    )
+    signal = Quantity(
+        type=str,
+        description='Signal mode ($CM_SIGNAL).',
         a_eln=ELNAnnotation(
             component=ELNComponentEnum.StringEditQuantity,
             overview=True,
@@ -132,12 +166,16 @@ class SEMSettings(ArchiveSection):
     sei_detector_mode = Quantity(
         type=float,
         description='SEI detector mode ($$SM_SEI_DETECTOR_MODE).',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.NumberEditQuantity, overview=False
+        ),
     )
     sei_detector_level = Quantity(
         type=float,
         description='SEI detector level ($$SM_SEI_DETECTOR_LEVEL).',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.NumberEditQuantity, overview=False
+        ),
     )
     image_resolution = Quantity(
         type=str,
@@ -147,46 +185,66 @@ class SEMSettings(ArchiveSection):
             overview=True,
         ),
     )
-    scan_angle = Quantity(type=str, description='Scan angle ($CM_SCAN_ANGLE).')
+    scan_angle = Quantity(
+        type=str,
+        description='Scan angle ($CM_SCAN_ANGLE).',
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.StringEditQuantity, overview=False
+        ),
+    )
     scan_speed = Quantity(
         type=float,
         description='Scan speed ($CM_SCAN_SPEED).',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.NumberEditQuantity, overview=False
+        ),
     )
     scan_average = Quantity(
         type=float,
         description='Scan average ($CM_SCAN_AVERAGE).',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.NumberEditQuantity, overview=False
+        ),
     )
     probe_current = Quantity(
         type=str,
         description='Probe current configuration ($CM_PROBE_CURRENT).',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.StringEditQuantity, overview=False
+        ),
     )
     emission = Quantity(
         type=float,
         description='Emission current ($CM_EMISSION).',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.NumberEditQuantity, overview=False
+        ),
     )
     gun_voltage = Quantity(
         type=float,
         description='Gun voltage ($SM_GB_GUN_VOLT).',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.NumberEditQuantity, overview=False
+        ),
     )
     bias_voltage = Quantity(
         type=float,
         description='Bias voltage ($SM_GB_BIAS_VOLT).',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.NumberEditQuantity, overview=False
+        ),
     )
     column_ecp_angle = Quantity(
         type=float,
         description='Column ECP angle ($SM_COLUM_ECP_ANGLE).',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.NumberEditQuantity, overview=False
+        ),
     )
     stage_position = SubSection(
         section_def=SEMStagePosition,
         description='Stage position during acquisition.',
-        a_eln=ELNAnnotation(overview=True),
+        a_eln=ELNAnnotation(overview=False),
     )
 
 
@@ -213,15 +271,14 @@ class SEMImage(ArchiveSection):
         a_eln=ELNAnnotation(
             overview=True,
             order=[
+                'title',
                 'image',
                 'image_id',
-                'format',
-                'version',
-                'signal',
-                'title',
                 'comment',
                 'date',
                 'time',
+                'format',
+                'version',
             ],
             lane_width='400px',
         )
@@ -232,22 +289,30 @@ class SEMImage(ArchiveSection):
     comment = Quantity(
         type=str,
         description='Comment ($CM_COMMENT).',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity, overview=True),
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.StringEditQuantity, overview=True
+        ),
     )
     title = Quantity(
         type=str,
         description='Title ($CM_TITLE).',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity, overview=True),
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.StringEditQuantity, overview=True
+        ),
     )
     time = Quantity(
         type=str,
         description='Acquisition time ($CM_TIME).',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity, overview=True),
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.StringEditQuantity, overview=True
+        ),
     )
     image_id = Quantity(
         type=str,
         description='Image identifier ($CM_IMAGEID).',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity, overview=True),
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.StringEditQuantity, overview=True
+        ),
     )
 
     image = Quantity(
@@ -276,7 +341,6 @@ class SEMImage(ArchiveSection):
         a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),
     )
 
-    signal = Quantity(type=str, description='Signal mode ($CM_SIGNAL).')
     film_number = Quantity(type=float, description='Film number ($$SM_FILM_NUMBER).')
     micron_bar = Quantity(type=float, description='Micron bar size ($$SM_MICRON_BAR).')
     micron_marker = Quantity(
