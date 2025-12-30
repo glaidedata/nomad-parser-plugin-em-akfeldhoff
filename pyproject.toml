@@ -12,7 +12,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: BSD License",
 ]
-name = "nomad-em"
+name = "nomad-em-parser-akfeldhoff"
 description = "Nomad example template"
 version = "0.1.0"
 readme = "README.md"
@@ -26,7 +26,8 @@ maintainers = [
 license = { file = "LICENSE" }
 dependencies = [
     "nomad-lab>=1.4.0",
-    
+    "pillow",
+
 ]
 
 [project.urls]
@@ -48,7 +49,7 @@ dev = [
 extra-index-url = [
   "https://gitlab.mpcdf.mpg.de/api/v4/projects/2187/packages/pypi/simple",
 ]
-    
+
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
 exclude = [
@@ -129,11 +130,9 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [project.entry-points.'nomad.plugin']
-parser_entry_point = "nomad_em.parsers:parser_entry_point"
-schema_package_entry_point = "nomad_em.schema_packages:schema_package_entry_point"
-
-
-example_upload_entry_point = "nomad_em.example_uploads:example_upload_entry_point"
+parser_entry_point = "nomad_em_parser_akfeldhoff.parsers:parser_entry_point"
+schema_package_entry_point = "nomad_em_parser_akfeldhoff.schema_packages:schema_package_entry_point"
+example_upload_entry_point = "nomad_em_parser_akfeldhoff.example_uploads:example_upload_entry_point"
 
 [tool.cruft]
 # Avoid updating workflow files, this leads to permissions issues
