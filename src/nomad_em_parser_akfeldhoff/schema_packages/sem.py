@@ -81,15 +81,10 @@ class SEMSettings(ArchiveSection):
             order=[
                 'display_mode',
                 'column_mode',
+                'acceleration_voltage',
+                'magnification',
+                'working_distance',
                 'image_resolution',
-                'scan_speed',
-                'scan_average',
-                'probe_current',
-                'emission',
-                'gun_voltage',
-                'bias_voltage',
-                'column_ecp_angle',
-                'stage_position',
             ],
             lane_width='400px',
         )
@@ -109,6 +104,29 @@ class SEMSettings(ArchiveSection):
         a_eln=ELNAnnotation(
             component=ELNComponentEnum.StringEditQuantity,
             overview=True,
+        ),
+    )
+    acceleration_voltage = Quantity(
+        type=float,
+        unit='kV',
+        description='Acceleration Voltage ($CM_ACCEL_VOLT)',
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.NumberEditQuantity, overview=True
+        ),
+    )
+    magnification = Quantity(
+        type=float,
+        description='Magnification ($CM_MAG)',
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.NumberEditQuantity, overview=True
+        ),
+    )
+    working_distance = Quantity(
+        type=float,
+        unit='mm',
+        description='Working Distance ($$SM_WD)',
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.NumberEditQuantity, overview=True
         ),
     )
     sei_detector_mode = Quantity(
@@ -212,10 +230,26 @@ class SEMImage(ArchiveSection):
 
     format = Quantity(type=str, description='Image format identifier ($CM_FORMAT).')
     version = Quantity(type=str, description='Format version ($CM_VERSION).')
-    comment = Quantity(type=str, description='Comment ($CM_COMMENT).')
-    title = Quantity(type=str, description='Title ($CM_TITLE).')
-    time = Quantity(type=str, description='Acquisition time ($CM_TIME).')
-    image_id = Quantity(type=str, description='Image identifier ($CM_IMAGEID).')
+    comment = Quantity(
+        type=str,
+        description='Comment ($CM_COMMENT).',
+        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity, overview=True),
+    )
+    title = Quantity(
+        type=str,
+        description='Title ($CM_TITLE).',
+        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity, overview=True),
+    )
+    time = Quantity(
+        type=str,
+        description='Acquisition time ($CM_TIME).',
+        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity, overview=True),
+    )
+    image_id = Quantity(
+        type=str,
+        description='Image identifier ($CM_IMAGEID).',
+        a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity, overview=True),
+    )
 
     image = Quantity(
         type=str,
@@ -254,15 +288,6 @@ class SEMImage(ArchiveSection):
         ),
     )
 
-    working_distance = Quantity(
-        type=float,
-        unit='mm',
-        description='Working Distance ($$SM_WD)',
-        a_eln=ELNAnnotation(
-            component=ELNComponentEnum.NumberEditQuantity, overview=True
-        ),
-    )
-
     date = Quantity(
         type=str,
         description='Date of acquisition ($CM_DATE)',
@@ -287,7 +312,7 @@ class SEMEntry(ArchiveSection):
         a_eln=ELNAnnotation(
             label='SEM Experiment (JEOL)',
             overview=True,
-            order=['name', 'description', 'instrument', 'settings', 'images'],
+            order=['name', 'lab_id', 'description', 'instrument', 'settings', 'images'],
             lane_width='600px',
         ),
     )
@@ -295,6 +320,13 @@ class SEMEntry(ArchiveSection):
     name = Quantity(
         type=str,
         description='Display name for this SEM entry.',
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.StringEditQuantity, overview=True
+        ),
+    )
+    lab_id = Quantity(
+        type=str,
+        description='Lab/sample identifier.',
         a_eln=ELNAnnotation(
             component=ELNComponentEnum.StringEditQuantity, overview=True
         ),
@@ -354,6 +386,7 @@ class SEMEntry(ArchiveSection):
         candidate_name = None
         for candidate in (
             getattr(self, 'name', None),
+            getattr(self, 'lab_id', None),
             getattr(primary_image, 'title', None),
             getattr(primary_image, 'image', None),
         ):
@@ -382,16 +415,28 @@ class SEMEntry(ArchiveSection):
 
         summary_bits = []
         if primary_image:
-            if primary_image.magnification is not None:
-                summary_bits.append(f'{primary_image.magnification:g}x')
-            if primary_image.acceleration_voltage is not None:
-                summary_bits.append(
-                    f'{primary_image.acceleration_voltage.magnitude:g} kV'
-                )
-            if primary_image.working_distance is not None:
-                summary_bits.append(
-                    f'WD {primary_image.working_distance.magnitude:g} mm'
-                )
+            # prefer settings values if present
+            mag = (
+                self.settings.magnification
+                if self.settings and self.settings.magnification is not None
+                else None
+            )
+            accel = (
+                self.settings.acceleration_voltage
+                if self.settings and self.settings.acceleration_voltage is not None
+                else None
+            )
+            wd = (
+                self.settings.working_distance
+                if self.settings and self.settings.working_distance is not None
+                else None
+            )
+            if mag is not None:
+                summary_bits.append(f'{mag:g}x')
+            if accel is not None:
+                summary_bits.append(f'{accel:g} kV')
+            if wd is not None:
+                summary_bits.append(f'WD {wd:g} mm')
             if primary_image.date:
                 summary_bits.append(f'date {primary_image.date}')
         if self.instrument and self.instrument.operator:
@@ -402,6 +447,10 @@ class SEMEntry(ArchiveSection):
             eln.descriptions = eln.descriptions or []
             if summary not in eln.descriptions:
                 eln.descriptions.append(summary)
+
+        # Set lab_id from image_id if missing
+        if not self.lab_id and primary_image and primary_image.image_id:
+            self.lab_id = primary_image.image_id
 
 
 m_package.__init_metainfo__()

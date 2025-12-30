@@ -128,6 +128,9 @@ class SEMParser(MatchingParser):
             for key in (
                 '$$SM_DISPLAY_MODE',
                 '$$SM_COLUMN_MODE',
+                '$CM_ACCEL_VOLT',
+                '$CM_MAG',
+                '$$SM_WD',
                 '$CM_IMAGE_RES',
                 '$CM_SCAN_SPEED',
                 '$CM_SCAN_AVERAGE',
@@ -147,6 +150,12 @@ class SEMParser(MatchingParser):
         settings.column_mode = metadata.get('$$SM_COLUMN_MODE')
         settings.sei_detector_mode = self._to_float(metadata.get('$$SM_SEI_DETECTOR_MODE'))
         settings.sei_detector_level = self._to_float(metadata.get('$$SM_SEI_DETECTOR_LEVEL'))
+        settings.acceleration_voltage = self._to_float(metadata.get('$CM_ACCEL_VOLT'))
+        settings.magnification = self._to_float(metadata.get('$CM_MAG'))
+        if '$$SM_WD' in metadata:
+            settings.working_distance = self._to_float(metadata.get('$$SM_WD'))
+        elif '$SM_WD' in metadata:
+            settings.working_distance = self._to_float(metadata.get('$SM_WD'))
         settings.image_resolution = metadata.get('$CM_IMAGE_RES')
         settings.scan_angle = metadata.get('$CM_SCAN_ANGLE')
         settings.scan_speed = self._to_float(metadata.get('$CM_SCAN_SPEED'))
@@ -189,24 +198,8 @@ class SEMParser(MatchingParser):
         image_section.time = metadata.get('$CM_TIME')
         image_section.image_id = metadata.get('$CM_IMAGEID', '').lstrip(': ').strip()
 
-        # Key numeric parameters
         image_section.signal = metadata.get('$CM_SIGNAL')
         image_section.film_number = self._to_float(metadata.get('$$SM_FILM_NUMBER'))
-
-        image_section.acceleration_voltage = self._to_quantity(
-            metadata.get('$CM_ACCEL_VOLT'), ureg.kV
-        )
-        image_section.magnification = self._to_float(metadata.get('$CM_MAG'))
-
-        if '$$SM_WD' in metadata:
-            image_section.working_distance = self._to_quantity(
-                metadata.get('$$SM_WD'), ureg.mm
-            )
-        elif '$SM_WD' in metadata:
-            image_section.working_distance = self._to_quantity(
-                metadata.get('$SM_WD'), ureg.mm
-            )
-
         image_section.micron_bar = self._to_float(metadata.get('$$SM_MICRON_BAR'))
         image_section.micron_marker = metadata.get('$$SM_MICRON_MARKER')
         image_section.font_size = metadata.get('$$SM_FONT_SIZE')

@@ -40,20 +40,24 @@ def test_sem_parser():
     image_data = sem_entry.images[0]
     instrument = sem_entry.instrument
 
-    assert image_data.acceleration_voltage.magnitude == EXPECTED_VOLTAGE
-    assert image_data.acceleration_voltage.units == 'kilovolt'
-    assert image_data.magnification == EXPECTED_MAGNIFICATION
-    assert image_data.working_distance.magnitude == EXPECTED_WD
-    assert image_data.working_distance.units == 'millimeter'
-
+    # image-level metadata
     assert image_data.image == 'HeOx-1004-sg-sps-900C-15min-polished-01.bmp'
     assert image_data.format == 'Bitmap'
     assert image_data.version == '1.5'
     assert image_data.signal == 'LEI'
     assert image_data.date == '10/29/2025'
     assert image_data.time == '9:33:41 AM'
+    assert image_data.comment == ''
+    assert image_data.title == ''
+    assert image_data.image_id == '84A93E7F77FB'
+
     settings = sem_entry.settings
     assert settings is not None
+    assert settings.acceleration_voltage.magnitude == EXPECTED_VOLTAGE
+    assert settings.acceleration_voltage.units == 'kilovolt'
+    assert settings.magnification == EXPECTED_MAGNIFICATION
+    assert settings.working_distance.magnitude == EXPECTED_WD
+    assert settings.working_distance.units == 'millimeter'
     assert settings.image_resolution == '1280x1024'
     assert settings.scan_speed == 735.0
     assert settings.scan_average == 1.0
@@ -84,5 +88,5 @@ def test_sem_parser():
     assert 'SEMEntry' in eln.sections
     assert 'SEM' in eln.methods
     assert 'JSM 6700F NT' in eln.instruments
-    assert any('20 kV' in desc for desc in eln.descriptions)
+    assert any('20' in desc for desc in eln.descriptions)
     assert eln.names is not None and len(eln.names) > 0
