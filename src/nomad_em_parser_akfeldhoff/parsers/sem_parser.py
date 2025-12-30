@@ -292,34 +292,19 @@ class SEMParser(MatchingParser):
         try:
             with Image.open(file_path) as img:
                 rgb = img.convert('RGB')
-                buf = io.BytesIO()
-                rgb.save(buf, format='PNG')
-                data_uri = (
-                    'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode()
-                )
+                z = rgb.tolist()  # nested lists of pixel values
 
             fig_section = SEMImagePlot()
             plotly_fig = PlotlyFigure()
             plotly_fig.label = 'SEM image'
             plotly_fig.figure = {
-                'data': [],
+                'data': [{'type': 'image', 'z': z}],
                 'layout': {
-                    'images': [
-                        {
-                            'source': data_uri,
-                            'xref': 'x',
-                            'yref': 'y',
-                            'x': 0,
-                            'y': 0,
-                            'sizex': 1,
-                            'sizey': 1,
-                            'sizing': 'stretch',
-                            'layer': 'below',
-                        }
-                    ],
-                    'xaxis': {'visible': False, 'range': [0, 1], 'constrain': 'domain'},
-                    'yaxis': {'visible': False, 'range': [1, 0], 'scaleanchor': 'x'},
+                    'xaxis': {'visible': False},
+                    'yaxis': {'visible': False, 'scaleanchor': 'x'},
                     'margin': {'l': 0, 'r': 0, 't': 0, 'b': 0},
+                    'height': rgb.height,
+                    'width': rgb.width,
                 },
             }
             fig_section.figures = [plotly_fig]
