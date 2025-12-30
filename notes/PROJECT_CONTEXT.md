@@ -7,9 +7,9 @@ This project is a NOMAD parser plugin for JEOL SEM data, designed to work within
 - **Parser for JEOL SEM data**: Detects and parses .txt metadata files with JEOL SEM format, and associates them with corresponding .bmp image files.
 - **Batch Processing**: Scans the entire upload directory for all valid txt+bmp pairs, not just the mainfile.
 - **Metadata Extraction**: Extracts the full set of key-value metadata from the JEOL txt, including voltages, magnification, working distance, signal, scan settings, detector settings, stage position, etc. Empty values are preserved for mapped fields.
-- **Schema Structure**: Stores results in a top-level `SEMEntry` with instrument info, instrument settings (incl. stage position), a list of `SEMImage` sections (image/display metadata), and the BMP image reference (RawFileAdaptor) plus a Plotly image preview. Fields are currently editable in the ELN for inspection.
+- **Schema Structure**: Stores results in a top-level `SEMEntry` with instrument info, instrument settings (incl. stage position), a list of `SEMImage` sections (image/display metadata), and the BMP image reference (RawFileAdaptor) plus a Plotly image preview. Fields are kept editable in the ELN for inspection.
+- **Overview Metadata**: `SEMEntry.normalize` populates `results.eln` (sections, methods, instruments, names, descriptions) so key sample and instrument info appears on the overview page. Images are marked for overview display. The current UI ignores `a_eln.order`, so overview-enabled sections show all quantities.
 - **NOMAD Plugin Integration**: Registered as a parser entry point for the NOMAD platform, using the `ParserEntryPoint` interface.
-- **Overview Metadata**: `SEMEntry.normalize` populates `results.eln` (sections, methods, instruments, names, descriptions) so key sample and instrument info appears on the overview page. Images are marked for overview display.
 
 ## File Structure
 - `src/nomad_em_parser_akfeldhoff/parsers/sem_parser.py`: Main SEM parser logic (class `SEMParser`).
@@ -24,7 +24,7 @@ This project is a NOMAD parser plugin for JEOL SEM data, designed to work within
 - **Entry Scope**: Each `.txt` mainfile is parsed as a single entry; it links only its matching `.bmp` (same basename).
 - **Metadata Parsing**: Reads all key-value pairs from the .txt file, mapping specific keys to typed schema fields (no raw key/value duplicates stored).
 - **Data Storage**: Populates `archive.data.instrument` and `archive.data.settings` (including accel. voltage, magnification, working distance), plus `archive.data.images[]` with `SEMImage` objects (RawFileAdaptor image reference and Plotly preview).
-- **Overview Population**: Parser calls `SEMEntry.normalize` to fill `results.eln` (sections, methods, instruments, names, descriptions); ELN layout/order defined via `a_eln` annotations (no deprecated SectionProperties).
+- **Overview Population**: Parser calls `SEMEntry.normalize` to fill `results.eln` (sections, methods, instruments, names, descriptions); ELN uses modern `a_eln` annotations (no deprecated SectionProperties). The front end currently ignores `order`, so hiding items requires moving them to a non-overview subsection.
 
 ## Example Metadata Keys Parsed
 - `$CM_ACCEL_VOLT` → acceleration_voltage (kV, stored in settings)
@@ -40,6 +40,8 @@ This project is a NOMAD parser plugin for JEOL SEM data, designed to work within
 ## Development Notes
 - Parser now maps the full txt key set present in the sample file; additional keys can be added similarly if encountered.
 - Only .txt files with the correct JEOL SEM signature are processed, reducing false positives.
+- Plotly image preview (`SEMImagePlot`) is populated from the BMP so the GUI shows the image without relying solely on RawFileAdaptor.
+- The `order` flag was left only for intent; the current UI ignores it. Section-level `overview=True` is what governs visibility.
 - The package was renamed from `nomad-em` to `nomad-em-parser-akfeldhoff` and is developed on a `test-refine` branch.
 
 ## Integration
