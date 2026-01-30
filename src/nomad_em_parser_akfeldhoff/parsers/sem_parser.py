@@ -9,6 +9,7 @@ import numpy as np
 from nomad.config import config
 from nomad.datamodel.metainfo.plot import PlotlyFigure
 from nomad.parsing.parser import MatchingParser
+from nomad.units import ureg
 from PIL import Image
 
 from nomad_em_parser_akfeldhoff.schema_packages.sem import (
@@ -196,6 +197,14 @@ class SEMParser(MatchingParser):
             self._raw_file_reference(bmp_path, archive, base_dir) or bmp_name
         )
 
+        width = None
+        if os.path.exists(bmp_path):
+            try:
+                with Image.open(bmp_path) as img:
+                    width, _ = img.size
+            except Exception:
+                pass
+
         image_section.format = metadata.get('$CM_FORMAT')
         image_section.version = metadata.get('$CM_VERSION')
         image_section.comment = metadata.get('$CM_COMMENT')
@@ -209,7 +218,16 @@ class SEMParser(MatchingParser):
         image_section.micron_marker = metadata.get('$$SM_MICRON_MARKER')
         image_section.font_size = metadata.get('$$SM_FONT_SIZE')
 
-        plot_section = self._build_image_plot(bmp_path)
+        if image_section.micron_bar and width:
+            # micron_bar is in microns, convert to meters
+            fov_width = image_section.micron_bar * ureg.um
+            image_section.pixel_size = fov_width / width
+
+        pixel_size_val = (
+            image_section.pixel_size.magnitude if image_section.pixel_size else None
+        )
+
+        plot_section = self._build_image_plot(bmp_path, pixel_size_val)
         if plot_section is not None:
             image_section.plot = plot_section
 
@@ -281,7 +299,9 @@ class SEMParser(MatchingParser):
             return os.path.basename(file_path)
 
     @staticmethod
-    def _build_image_plot(file_path: str) -> SEMImagePlot | None:
+    def _build_image_plot(
+        file_path: str, pixel_size: float | None = None
+    ) -> SEMImagePlot | None:
         """
         Build a Plotly image figure from the BMP so the GUI can render it without relying
         solely on RawFileAdaptor.
@@ -294,12 +314,39 @@ class SEMParser(MatchingParser):
             fig_section = SEMImagePlot()
             plotly_fig = PlotlyFigure()
             plotly_fig.label = 'SEM image'
+
+            # Default: Pixel coordinates
+            dx = 1
+            dy = 1
+            unit_label = 'pixels'
+
+            # If we have a scale, switch to Microns
+            if pixel_size:
+                dx = pixel_size * 1e6
+                dy = pixel_size * 1e6
+                unit_label = 'µm'
+
             plotly_fig.figure = {
-                'data': [{'type': 'image', 'z': z}],
+                'data': [{'type': 'image', 'z': z, 'dx': dx, 'dy': dy}],
                 'layout': {
-                    'xaxis': {'visible': False},
-                    'yaxis': {'visible': False, 'scaleanchor': 'x'},
-                    'margin': {'l': 0, 'r': 0, 't': 0, 'b': 0},
+                    # Turn AXES ON so we can see the scale bar (ruler)
+                    'xaxis': {
+                        'visible': True,
+                        'title': {'text': unit_label},
+                        'ticks': 'outside',
+                    },
+                    'yaxis': {
+                        'visible': True,
+                        'title': {'text': unit_label},
+                        'ticks': 'outside',
+                        'scaleanchor': 'x',
+                    },
+                    'margin': {
+                        'l': 50,
+                        'r': 0,
+                        't': 0,
+                        'b': 50,
+                    },  # Add margin for axis labels
                     'height': rgb.height,
                     'width': rgb.width,
                 },

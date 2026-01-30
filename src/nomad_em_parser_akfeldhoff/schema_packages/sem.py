@@ -6,6 +6,7 @@ if TYPE_CHECKING:
 from nomad.config import config
 from nomad.datamodel.data import ArchiveSection
 from nomad.datamodel.metainfo.annotations import ELNAnnotation, ELNComponentEnum
+from nomad.datamodel.metainfo.basesections import Measurement
 from nomad.datamodel.metainfo.plot import PlotSection
 from nomad.datamodel.results import ELN, Results
 from nomad.metainfo import Quantity, SchemaPackage, Section, SubSection
@@ -318,6 +319,12 @@ class SEMImage(ArchiveSection):
         type=str, description='Micron marker label ($$SM_MICRON_MARKER).'
     )
     font_size = Quantity(type=str, description='Font size settings ($$SM_FONT_SIZE).')
+    pixel_size = Quantity(
+        type=float,
+        unit='m',
+        description='Physical size of one pixel. Necessary for drawing scale bars.',
+        a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),
+    )
     plot = SubSection(
         section_def=SEMImagePlot,
         description='Image preview plot.',
@@ -325,7 +332,7 @@ class SEMImage(ArchiveSection):
     )
 
 
-class SEMEntry(ArchiveSection):
+class SEMEntry(Measurement):
     """
     Top-level entry for an SEM experiment containing multiple images.
     """

@@ -51,6 +51,9 @@ def test_sem_parser():  # noqa: PLR0915
     assert image_data.comment == ''
     assert image_data.title == ''
     assert image_data.image_id == '84A93E7F77FB'
+    # Check that Scale Bar logic worked
+    assert image_data.pixel_size is not None
+    assert image_data.pixel_size.magnitude > 0
 
     settings = sem_entry.settings
     assert settings is not None
