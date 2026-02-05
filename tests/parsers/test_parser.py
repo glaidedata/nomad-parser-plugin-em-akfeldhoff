@@ -1,12 +1,9 @@
-import logging
 import os
 
 import pytest
-from nomad.client import parse
-from nomad.datamodel import EntryArchive
+from nomad.client import normalize_all, parse
 from nomad.utils import hash as m_hash
 
-from nomad_em_parser_akfeldhoff.parsers.sem_parser import SEMParser
 from nomad_em_parser_akfeldhoff.schema_packages.sem import RawFileSEMData
 
 # Define constants
@@ -31,9 +28,13 @@ def test_sem_parser():  # noqa: PLR0915
     file_archive = parse(mainfile)[0]
 
     # 3. Verify the data file entry was created
-    assert file_archive.data is not None, 'Parser failed to create an entry in archive.data'
-    assert isinstance(file_archive.data, RawFileSEMData), 'Expected RawFileSEMData entry'
-    
+    assert file_archive.data is not None, (
+        'Parser failed to create an entry in archive.data'
+    )
+    assert isinstance(file_archive.data, RawFileSEMData), (
+        'Expected RawFileSEMData entry'
+    )
+
     # 4. Verify the measurement reference was created
     rel_measurement_archive_path = os.path.join(
         mainfile.rsplit('.', 1)[0] + '.archive.json'
@@ -50,6 +51,10 @@ def test_sem_parser():  # noqa: PLR0915
 
     # 5. Parse the measurement archive (the ELN entry)
     measurement_archive = parse(rel_measurement_archive_path)[0]
+
+    # 5a. Normalize the measurement archive to populate results
+    normalize_all(measurement_archive)
+
     sem_entry = measurement_archive.data
 
     # 6. Verify the measurement entry
@@ -110,7 +115,7 @@ def test_sem_parser():  # noqa: PLR0915
     assert measurement_archive.results is not None
     assert measurement_archive.results.eln is not None
     eln = measurement_archive.results.eln
-    assert 'SEMExperiment' in eln.sections
+    assert 'ELNSEMExperiment' in eln.sections
     assert 'SEM' in eln.methods
     assert 'JSM 6700F NT' in eln.instruments
     assert any('20' in desc for desc in eln.descriptions)

@@ -16,7 +16,6 @@ from PIL import Image
 from nomad_em_parser_akfeldhoff.schema_packages.sem import (
     ELNSEMExperiment,
     RawFileSEMData,
-    SEMExperiment,
     SEMImage,
     SEMImagePlot,
     SEMInstrument,
@@ -57,13 +56,15 @@ class SEMParser(MatchingParser):
             ELNSEMExperiment.m_def.a_template or {}
         )
         eln_entry.images = []
-        
+
         # Determine the data_file path
         data_file = mainfile_name
         if isinstance(archive.m_context, ServerContext):
             # In server context, use relative path from upload root
-            data_file = mainfile.split('/raw/', 1)[1] if '/raw/' in mainfile else mainfile_name
-        
+            data_file = (
+                mainfile.split('/raw/', 1)[1] if '/raw/' in mainfile else mainfile_name
+            )
+
         eln_entry.data_file = data_file
 
         # 2. Populate instrument and settings
@@ -86,7 +87,7 @@ class SEMParser(MatchingParser):
         # 4. Create the ELN archive and get reference
         file_name = f'{"".join(mainfile_name.split(".")[:-1])}.archive.json'
         measurement_ref = create_archive(eln_entry, archive, file_name)
-        
+
         # 5. Store the data file entry with reference to measurement
         archive.data = RawFileSEMData(measurement=measurement_ref)
         archive.metadata.entry_name = f'{mainfile_name} data file'
