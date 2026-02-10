@@ -1,10 +1,10 @@
-import logging
 import os
 
 import pytest
-from nomad.datamodel import EntryArchive
+from nomad.client import normalize_all, parse
+from nomad.utils import hash as m_hash
 
-from nomad_em_parser_akfeldhoff.parsers.sem_parser import SEMParser
+from nomad_em_parser_akfeldhoff.schema_packages.sem import RawFileSEMData
 
 # Define constants
 EXPECTED_VOLTAGE = 20.0
@@ -24,16 +24,41 @@ def test_sem_parser():  # noqa: PLR0915
 
     assert os.path.exists(mainfile), f'Test file not found at: {mainfile}'
 
-    # 2. Setup the Parser and Archive
-    archive = EntryArchive()
-    parser = SEMParser()
+    # 2. Use nomad.client.parse to properly set up the context
+    file_archive = parse(mainfile)[0]
 
-    # 3. Run the Parser
-    parser.parse(mainfile, archive, logging.getLogger())
+    # 3. Verify the data file entry was created
+    assert file_archive.data is not None, (
+        'Parser failed to create an entry in archive.data'
+    )
+    assert isinstance(file_archive.data, RawFileSEMData), (
+        'Expected RawFileSEMData entry'
+    )
 
-    # 4. Verify the Results
-    sem_entry = archive.data
-    assert sem_entry is not None, 'Parser failed to create an entry in archive.data'
+    # 4. Verify the measurement reference was created
+    rel_measurement_archive_path = os.path.join(
+        mainfile.rsplit('.', 1)[0] + '.archive.json'
+    )
+    upload_id = None
+    expected_ref = (
+        f'../uploads/{upload_id}/archive/'
+        f'{m_hash(upload_id, os.path.basename(rel_measurement_archive_path))}#data'
+    )
+    assert file_archive.data.measurement.m_proxy_value == expected_ref, (
+        f'Expected measurement reference {expected_ref}, '
+        f'got {file_archive.data.measurement.m_proxy_value}'
+    )
+
+    # 5. Parse the measurement archive (the ELN entry)
+    measurement_archive = parse(rel_measurement_archive_path)[0]
+
+    # 5a. Normalize the measurement archive to populate results
+    normalize_all(measurement_archive)
+
+    sem_entry = measurement_archive.data
+
+    # 6. Verify the measurement entry
+    assert sem_entry is not None, 'Parser failed to create measurement entry'
 
     assert len(sem_entry.images) == 1, (
         f'Expected 1 image, but found {len(sem_entry.images)}'
@@ -87,11 +112,17 @@ def test_sem_parser():  # noqa: PLR0915
     assert instrument.operator == 'GENERAL'
 
     # Overview data populated in results.eln
-    assert archive.results is not None
-    assert archive.results.eln is not None
-    eln = archive.results.eln
-    assert 'SEMEntry' in eln.sections
+    assert measurement_archive.results is not None
+    assert measurement_archive.results.eln is not None
+    eln = measurement_archive.results.eln
+    assert 'ELNSEMExperiment' in eln.sections
     assert 'SEM' in eln.methods
     assert 'JSM 6700F NT' in eln.instruments
     assert any('20' in desc for desc in eln.descriptions)
     assert eln.names is not None and len(eln.names) > 0
+
+    # Clean up the created .archive.json file
+    try:
+        os.remove(rel_measurement_archive_path)
+    except FileNotFoundError:
+        pass

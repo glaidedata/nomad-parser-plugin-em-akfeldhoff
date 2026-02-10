@@ -4,9 +4,13 @@ if TYPE_CHECKING:
     pass
 
 from nomad.config import config
-from nomad.datamodel.data import ArchiveSection
-from nomad.datamodel.metainfo.annotations import ELNAnnotation, ELNComponentEnum
-from nomad.datamodel.metainfo.basesections import Measurement
+from nomad.datamodel.data import ArchiveSection, EntryData
+from nomad.datamodel.metainfo.annotations import (
+    ELNAnnotation,
+    ELNComponentEnum,
+    SectionProperties,
+)
+from nomad.datamodel.metainfo.basesections import Measurement, ReadableIdentifiers
 from nomad.datamodel.metainfo.plot import PlotSection
 from nomad.datamodel.results import ELN, Results
 from nomad.metainfo import Quantity, SchemaPackage, Section, SubSection
@@ -332,18 +336,13 @@ class SEMImage(ArchiveSection):
     )
 
 
-class SEMEntry(Measurement):
+class SEMExperiment(Measurement):
     """
-    Top-level entry for an SEM experiment containing multiple images.
+    Base class for an SEM experiment containing multiple images.
+    Can be used standalone or through the ELN interface.
     """
 
-    m_def = Section(
-        a_eln=ELNAnnotation(
-            label='SEM Experiment (JEOL)',
-            overview=True,
-            lane_width='600px',
-        ),
-    )
+    m_def = Section()
 
     name = Quantity(
         type=str,
@@ -478,6 +477,63 @@ class SEMEntry(Measurement):
         # Set lab_id from image_id if missing
         if not self.lab_id and primary_image and primary_image.image_id:
             self.lab_id = primary_image.image_id
+
+
+class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
+    """
+    ELN-compatible SEM experiment entry that can be edited in the GUI.
+    This entry is created separately from the data file entry to allow
+    users to add metadata, link samples/instruments, etc. without
+    overwriting the parsed data.
+    """
+
+    m_def = Section(
+        label='SEM Experiment (JEOL)',
+        a_eln=ELNAnnotation(
+            overview=True,
+            lane_width='800px',
+            properties=SectionProperties(
+                order=[
+                    'name',
+                    'datetime',
+                    'data_file',
+                    'lab_id',
+                    'location',
+                    'description',
+                ]
+            ),
+        ),
+        a_template={
+            'measurement_identifiers': {},
+        },
+    )
+
+    data_file = Quantity(
+        type=str,
+        description='Data file containing the SEM image and metadata (.txt file)',
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.FileEditQuantity,
+        ),
+    )
+
+    measurement_identifiers = SubSection(
+        section_def=ReadableIdentifiers,
+    )
+
+
+class RawFileSEMData(EntryData):
+    """
+    Section for a SEM data file entry.
+    This entry stores the parsed data from the .txt/.bmp files
+    and references the corresponding ELN measurement entry.
+    """
+
+    measurement = Quantity(
+        type=ELNSEMExperiment,
+        a_eln=ELNAnnotation(
+            component='ReferenceEditQuantity',
+        ),
+    )
 
 
 m_package.__init_metainfo__()

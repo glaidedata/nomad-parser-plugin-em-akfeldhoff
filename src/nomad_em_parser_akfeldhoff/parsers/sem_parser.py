@@ -7,19 +7,22 @@ if TYPE_CHECKING:
 
 import numpy as np
 from nomad.config import config
+from nomad.datamodel.context import ServerContext
 from nomad.datamodel.metainfo.plot import PlotlyFigure
 from nomad.parsing.parser import MatchingParser
 from nomad.units import ureg
 from PIL import Image
 
 from nomad_em_parser_akfeldhoff.schema_packages.sem import (
-    SEMEntry,
+    ELNSEMExperiment,
+    RawFileSEMData,
     SEMImage,
     SEMImagePlot,
     SEMInstrument,
     SEMSettings,
     SEMStagePosition,
 )
+from nomad_em_parser_akfeldhoff.utils import create_archive
 
 configuration = config.get_plugin_entry_point(
     'nomad_em_parser_akfeldhoff.parsers:parser_entry_point'
@@ -36,10 +39,6 @@ class SEMParser(MatchingParser):
     ) -> None:
         logger.info('SEMParser.parse')
 
-        # 1. Create the main Entry structure
-        sem_entry = SEMEntry()
-        sem_entry.images = []
-
         mainfile_dir = os.path.dirname(mainfile)
         mainfile_name = os.path.basename(mainfile)
         if not mainfile_name.endswith('.txt'):
@@ -51,28 +50,47 @@ class SEMParser(MatchingParser):
         # Parse the mainfile text
         metadata = self.read_jeol_txt(mainfile, logger)
 
-        # Populate instrument and settings
+        # 1. Create the measurement (ELN) entry with parsed data
+        # This will be stored in a separate .archive.json file
+        eln_entry = ELNSEMExperiment.m_from_dict(
+            ELNSEMExperiment.m_def.a_template or {}
+        )
+        eln_entry.images = []
+
+        # Determine the data_file path
+        data_file = mainfile_name
+        if isinstance(archive.m_context, ServerContext):
+            # In server context, use relative path from upload root
+            data_file = (
+                mainfile.split('/raw/', 1)[1] if '/raw/' in mainfile else mainfile_name
+            )
+
+        eln_entry.data_file = data_file
+
+        # 2. Populate instrument and settings
         instrument_section = self.build_instrument(metadata)
         if instrument_section is not None:
-            sem_entry.instrument = instrument_section
+            eln_entry.instrument = instrument_section
         settings_section = self.build_settings(metadata)
         if settings_section is not None:
-            sem_entry.settings = settings_section
+            eln_entry.settings = settings_section
 
-        # Attach the matching BMP (same basename)
+        # 3. Attach the matching BMP (same basename)
         bmp_name = mainfile_name.replace('.txt', '.bmp')
         bmp_path = os.path.join(mainfile_dir, bmp_name)
         if os.path.exists(bmp_path):
             image_section = self.build_image_section(
                 metadata, bmp_name, bmp_path, archive, mainfile_dir
             )
-            sem_entry.images.append(image_section)
+            eln_entry.images.append(image_section)
 
-        # 6. Store the populated entry into the archive
-        archive.data = sem_entry
-        # Populate overview-related metadata immediately (normalizer would do this in production)
-        if hasattr(sem_entry, 'normalize'):
-            sem_entry.normalize(archive, logger)
+        # 4. Create the ELN archive and get reference
+        file_name = f'{"".join(mainfile_name.split(".")[:-1])}.archive.json'
+        measurement_ref = create_archive(eln_entry, archive, file_name)
+
+        # 5. Store the data file entry with reference to measurement
+        archive.data = RawFileSEMData(measurement=measurement_ref)
+        archive.metadata.entry_name = f'{mainfile_name} data file'
 
     def read_jeol_txt(self, filepath, logger=None):
         """
