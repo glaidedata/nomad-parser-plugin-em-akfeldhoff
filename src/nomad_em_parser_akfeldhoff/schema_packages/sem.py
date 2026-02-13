@@ -374,7 +374,7 @@ class SEMExperiment(Measurement):
         label='images',
         a_eln=ELNAnnotation(overview=True),
     )
-    instrument = SubSection(
+    instrument_metadata = SubSection(
         section_def=SEMInstrument,
         description='Instrument metadata captured from the JEOL txt.',
         a_eln=ELNAnnotation(overview=True),
@@ -403,10 +403,10 @@ class SEMExperiment(Measurement):
         if 'SEM' not in eln.methods:
             eln.methods.append('SEM')
 
-        if self.instrument and self.instrument.name:
+        if self.instrument_metadata and self.instrument_metadata.name:
             eln.instruments = eln.instruments or []
-            if self.instrument.name not in eln.instruments:
-                eln.instruments.append(self.instrument.name)
+            if self.instrument_metadata.name not in eln.instruments:
+                eln.instruments.append(self.instrument_metadata.name)
 
         primary_image = self.images[0] if self.images else None
         candidate_name = None
@@ -465,8 +465,8 @@ class SEMExperiment(Measurement):
                 summary_bits.append(f'WD {wd:g} mm')
             if primary_image.date:
                 summary_bits.append(f'date {primary_image.date}')
-        if self.instrument and self.instrument.operator:
-            summary_bits.append(f'operator {self.instrument.operator}')
+        if self.instrument_metadata and self.instrument_metadata.operator:
+            summary_bits.append(f'operator {self.instrument_metadata.operator}')
 
         if summary_bits:
             summary = ', '.join(summary_bits)

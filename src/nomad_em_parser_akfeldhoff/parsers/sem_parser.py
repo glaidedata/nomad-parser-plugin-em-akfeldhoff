@@ -70,7 +70,7 @@ class SEMParser(MatchingParser):
         # 2. Populate instrument and settings
         instrument_section = self.build_instrument(metadata)
         if instrument_section is not None:
-            eln_entry.instrument = instrument_section
+            eln_entry.instrument_metadata = instrument_section
         settings_section = self.build_settings(metadata)
         if settings_section is not None:
             eln_entry.settings = settings_section
