@@ -13,10 +13,10 @@ from nomad.datamodel.metainfo.annotations import (
     SectionProperties,
 )
 from nomad.datamodel.metainfo.basesections import Measurement, ReadableIdentifiers
-from nomad.datamodel.metainfo.plot import PlotSection, PlotlyFigure
+from nomad.datamodel.metainfo.plot import PlotlyFigure, PlotSection
 from nomad.datamodel.results import ELN, Results
-from nomad.units import ureg
 from nomad.metainfo import Quantity, SchemaPackage, Section, SubSection
+from nomad.units import ureg
 from PIL import Image
 
 configuration = config.get_plugin_entry_point(
@@ -658,7 +658,9 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
         )
         settings.probe_current = metadata.get('$CM_PROBE_CURRENT')
         settings.emission = ELNSEMExperiment._to_float(metadata.get('$CM_EMISSION'))
-        settings.gun_voltage = ELNSEMExperiment._to_float(metadata.get('$SM_GB_GUN_VOLT'))
+        settings.gun_voltage = ELNSEMExperiment._to_float(
+            metadata.get('$SM_GB_GUN_VOLT')
+        )
         settings.bias_voltage = ELNSEMExperiment._to_float(
             metadata.get('$SM_GB_BIAS_VOLT')
         )
@@ -742,7 +744,8 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
     ) -> SEMImage:
         image_section = SEMImage()
         image_section.image = (
-            ELNSEMExperiment._raw_file_reference(bmp_path, archive, base_dir) or bmp_name
+            ELNSEMExperiment._raw_file_reference(bmp_path, archive, base_dir)
+            or bmp_name
         )
 
         width = None
