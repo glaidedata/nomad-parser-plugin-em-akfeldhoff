@@ -65,7 +65,7 @@ def test_sem_parser():  # noqa: PLR0915
     )
 
     image_data = sem_entry.images[0]
-    instrument = sem_entry.instrument
+    instrument = sem_entry.instrument_metadata
 
     # image-level metadata
     assert image_data.image == 'HeOx-1004-sg-sps-900C-15min-polished-01.bmp'
