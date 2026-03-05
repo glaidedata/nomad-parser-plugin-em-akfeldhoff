@@ -339,7 +339,6 @@ class SEMAcquisition(ArchiveSection):
         a_eln=ELNAnnotation(overview=True),
     )
 
-
     settings = SubSection(
         section_def=SEMSettings,
         description='Instrument settings captured during this specific acquisition.',
@@ -449,9 +448,21 @@ class SEMExperiment(Measurement):
         if primary_acquisition:
             # Extract summary data from the nested settings of the first acquisition
             settings = primary_acquisition.settings
-            mag = settings.magnification if settings and settings.magnification is not None else None
-            accel = settings.acceleration_voltage if settings and settings.acceleration_voltage is not None else None
-            wd = settings.working_distance if settings and settings.working_distance is not None else None
+            mag = (
+                settings.magnification
+                if settings and settings.magnification is not None
+                else None
+            )
+            accel = (
+                settings.acceleration_voltage
+                if settings and settings.acceleration_voltage is not None
+                else None
+            )
+            wd = (
+                settings.working_distance
+                if settings and settings.working_distance is not None
+                else None
+            )
 
             if mag is not None:
                 summary_bits.append(f'{mag:g}x')
@@ -766,7 +777,6 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
 
         return acquisition
 
-
     def _scan_and_populate_acquisitions(self, archive, logger) -> None:
         """
         Scan the directory of this ELN entry for JEOL .txt files and matching .bmp files.
@@ -784,7 +794,9 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
 
         # 2. Enumerate candidate .txt files in a stable sorted order
         try:
-            txt_files = sorted([f for f in os.listdir(base_dir) if f.lower().endswith('.txt')])
+            txt_files = sorted(
+                [f for f in os.listdir(base_dir) if f.lower().endswith('.txt')]
+            )
         except Exception as exc:
             logger.warning(f'Error reading directory {base_dir}: {exc}')
             return
@@ -800,7 +812,9 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
 
             # Parse metadata and verify JEOL signature
             metadata = ELNSEMExperiment._read_jeol_txt(txt_path, logger)
-            if not any(k.startswith('$CM_') or k.startswith('$$SM_') for k in metadata.keys()):
+            if not any(
+                k.startswith('$CM_') or k.startswith('$$SM_') for k in metadata.keys()
+            ):
                 continue  # Skip non-JEOL files
 
             # Find corresponding .bmp. Policy: skip if missing
@@ -808,11 +822,16 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
             bmp_path = os.path.join(base_dir, bmp_name)
 
             if not os.path.exists(bmp_path):
-                logger.warning(f'Missing matching .bmp for {txt_name}, skipping acquisition.')
+                logger.warning(
+                    f'Missing matching .bmp for {txt_name}, skipping acquisition.'
+                )
                 continue
 
             # Idempotency check
-            expected_image_ref = ELNSEMExperiment._raw_file_reference(bmp_path, archive, base_dir) or bmp_name
+            expected_image_ref = (
+                ELNSEMExperiment._raw_file_reference(bmp_path, archive, base_dir)
+                or bmp_name
+            )
             if expected_image_ref in existing_images:
                 continue
 

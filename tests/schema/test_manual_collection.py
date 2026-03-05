@@ -1,8 +1,8 @@
 import os
 from unittest.mock import MagicMock
-import pytest
 
 from nomad.datamodel import EntryArchive, EntryMetadata
+
 from nomad_em_parser_akfeldhoff.schema_packages.sem import ELNSEMExperiment
 
 # Define constants from your original test
@@ -11,6 +11,7 @@ EXPECTED_MAGNIFICATION = 250.0
 EXPECTED_WD = 15.2
 EXPECTED_SCAN_SPEED = 735.0
 EXPECTED_EMISSION = 10.0
+
 
 def test_manual_collection_and_idempotency():
     # 1. Setup paths
@@ -33,10 +34,13 @@ def test_manual_collection_and_idempotency():
     eln_entry.normalize(archive, logger)
 
     # 4. Verify the acquisitions
-    assert eln_entry.acquisitions is not None, "Acquisitions list should be created"
+    assert eln_entry.acquisitions is not None, 'Acquisitions list should be created'
 
     # We expect 2 acquisitions (the 03.txt file should be skipped because it lacks a .bmp)
-    assert len(eln_entry.acquisitions) == 2, f"Expected 2 acquisitions, got {len(eln_entry.acquisitions)}"
+    Acquisitions_COUNT = 2
+    assert len(eln_entry.acquisitions) == Acquisitions_COUNT, (
+        f'Expected 2 acquisitions, got {len(eln_entry.acquisitions)}'
+    )
 
     # 5. Verify the data nested inside the first acquisition
     acq_01 = eln_entry.acquisitions[0]
@@ -58,5 +62,8 @@ def test_manual_collection_and_idempotency():
     assert instrument.operator == 'GENERAL'
 
     # 7. Test Idempotency (Running normalize a second time shouldn't duplicate entries)
+    Acquisitions_COUNT = 2
     eln_entry.normalize(archive, logger)
-    assert len(eln_entry.acquisitions) == 2, "Idempotency failed: normalizing twice duplicated the acquisitions!"
+    assert len(eln_entry.acquisitions) == Acquisitions_COUNT, (
+        'Idempotency failed: normalizing twice duplicated the acquisitions!'
+    )
