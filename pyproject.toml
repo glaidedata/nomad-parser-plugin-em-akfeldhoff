@@ -130,7 +130,7 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [project.entry-points.'nomad.plugin']
-parser_entry_point = "nomad_em_parser_akfeldhoff.parsers:parser_entry_point"
+# parser_entry_point = "nomad_em_parser_akfeldhoff.parsers:parser_entry_point"
 schema_package_entry_point = "nomad_em_parser_akfeldhoff.schema_packages:schema_package_entry_point"
 example_upload_entry_point = "nomad_em_parser_akfeldhoff.example_uploads:example_upload_entry_point"
 

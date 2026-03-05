@@ -844,19 +844,4 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
         super().normalize(archive, logger)
 
 
-class RawFileSEMData(EntryData):
-    """
-    Section for a SEM data file entry.
-    This entry stores the parsed data from the .txt/.bmp files
-    and references the corresponding ELN measurement entry.
-    """
-
-    measurement = Quantity(
-        type=ELNSEMExperiment,
-        a_eln=ELNAnnotation(
-            component='ReferenceEditQuantity',
-        ),
-    )
-
-
 m_package.__init_metainfo__()
