@@ -260,7 +260,7 @@ class SEMImagePlot(PlotSection):
     )
 
 
-class SEMImage(ArchiveSection):
+class SEMAcquisition(ArchiveSection):
     """
     Section representing a single SEM image and its extracted metadata.
     """
@@ -340,6 +340,13 @@ class SEMImage(ArchiveSection):
     )
 
 
+    settings = SubSection(
+        section_def=SEMSettings,
+        description='Instrument settings captured during this specific acquisition.',
+        a_eln=ELNAnnotation(overview=True),
+    )
+
+
 class SEMExperiment(Measurement):
     """
     Base class for an SEM experiment containing multiple images.
@@ -371,21 +378,16 @@ class SEMExperiment(Measurement):
         ),
     )
 
-    # This SubSection holds the list of images found in the folder
-    images = SubSection(
-        section_def=SEMImage,
+    acquisitions = SubSection(
+        section_def=SEMAcquisition,
         repeats=True,
-        label='images',
+        label='Acquisitions',
         a_eln=ELNAnnotation(overview=True),
     )
+
     instrument_metadata = SubSection(
         section_def=SEMInstrument,
         description='Instrument metadata captured from the JEOL txt.',
-        a_eln=ELNAnnotation(overview=True),
-    )
-    settings = SubSection(
-        section_def=SEMSettings,
-        description='Instrument settings captured from the JEOL txt.',
         a_eln=ELNAnnotation(overview=True),
     )
 
@@ -412,20 +414,20 @@ class SEMExperiment(Measurement):
             if self.instrument_metadata.name not in eln.instruments:
                 eln.instruments.append(self.instrument_metadata.name)
 
-        primary_image = self.images[0] if self.images else None
+        primary_acquisition = self.acquisitions[0] if self.acquisitions else None
         candidate_name = None
         for candidate in (
             getattr(self, 'name', None),
             getattr(self, 'lab_id', None),
-            getattr(primary_image, 'title', None),
-            getattr(primary_image, 'image', None),
+            getattr(primary_acquisition, 'title', None),
+            getattr(primary_acquisition, 'image', None),
         ):
             if candidate:
                 candidate_name = candidate
                 break
+
         if candidate_name:
             if not self.name:
-                # strip known image suffixes when using filename as fallback name
                 stripped = (
                     candidate_name.rsplit('.', 1)[0]
                     if candidate_name.lower().endswith(
@@ -444,31 +446,22 @@ class SEMExperiment(Measurement):
                 archive.metadata.entry_name = candidate_name
 
         summary_bits = []
-        if primary_image:
-            # prefer settings values if present
-            mag = (
-                self.settings.magnification
-                if self.settings and self.settings.magnification is not None
-                else None
-            )
-            accel = (
-                self.settings.acceleration_voltage
-                if self.settings and self.settings.acceleration_voltage is not None
-                else None
-            )
-            wd = (
-                self.settings.working_distance
-                if self.settings and self.settings.working_distance is not None
-                else None
-            )
+        if primary_acquisition:
+            # Extract summary data from the nested settings of the first acquisition
+            settings = primary_acquisition.settings
+            mag = settings.magnification if settings and settings.magnification is not None else None
+            accel = settings.acceleration_voltage if settings and settings.acceleration_voltage is not None else None
+            wd = settings.working_distance if settings and settings.working_distance is not None else None
+
             if mag is not None:
                 summary_bits.append(f'{mag:g}x')
             if accel is not None:
                 summary_bits.append(f'{accel:g} kV')
             if wd is not None:
                 summary_bits.append(f'WD {wd:g} mm')
-            if primary_image.date:
-                summary_bits.append(f'date {primary_image.date}')
+            if primary_acquisition.date:
+                summary_bits.append(f'date {primary_acquisition.date}')
+
         if self.instrument_metadata and self.instrument_metadata.operator:
             summary_bits.append(f'operator {self.instrument_metadata.operator}')
 
@@ -479,16 +472,13 @@ class SEMExperiment(Measurement):
                 eln.descriptions.append(summary)
 
         # Set lab_id from image_id if missing
-        if not self.lab_id and primary_image and primary_image.image_id:
-            self.lab_id = primary_image.image_id
+        if not self.lab_id and primary_acquisition and primary_acquisition.image_id:
+            self.lab_id = primary_acquisition.image_id
 
 
 class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
     """
     ELN-compatible SEM experiment entry that can be edited in the GUI.
-    This entry is created separately from the data file entry to allow
-    users to add metadata, link samples/instruments, etc. without
-    overwriting the parsed data.
     """
 
     m_def = Section(
@@ -500,7 +490,6 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
                 order=[
                     'name',
                     'datetime',
-                    'data_file',
                     'lab_id',
                     'location',
                     'description',
@@ -510,14 +499,6 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
         a_template={
             'measurement_identifiers': {},
         },
-    )
-
-    data_file = Quantity(
-        type=str,
-        description='Data file containing the SEM image and metadata (.txt file)',
-        a_eln=ELNAnnotation(
-            component=ELNComponentEnum.FileEditQuantity,
-        ),
     )
 
     measurement_identifiers = SubSection(
@@ -735,15 +716,15 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
             return None
 
     @staticmethod
-    def _build_image_section(
+    def _build_acquisition_section(
         metadata: dict[str, str],
         bmp_name: str,
         bmp_path: str,
         archive,
         base_dir: str,
-    ) -> SEMImage:
-        image_section = SEMImage()
-        image_section.image = (
+    ) -> SEMAcquisition:
+        acquisition = SEMAcquisition()
+        acquisition.image = (
             ELNSEMExperiment._raw_file_reference(bmp_path, archive, base_dir)
             or bmp_name
         )
@@ -756,72 +737,110 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
             except Exception:
                 pass
 
-        image_section.format = metadata.get('$CM_FORMAT')
-        image_section.version = metadata.get('$CM_VERSION')
-        image_section.comment = metadata.get('$CM_COMMENT')
-        image_section.title = metadata.get('$CM_TITLE')
-        image_section.date = metadata.get('$CM_DATE')
-        image_section.time = metadata.get('$CM_TIME')
-        image_section.image_id = metadata.get('$CM_IMAGEID', '').lstrip(': ').strip()
-        image_section.film_number = ELNSEMExperiment._to_float(
+        acquisition.format = metadata.get('$CM_FORMAT')
+        acquisition.version = metadata.get('$CM_VERSION')
+        acquisition.comment = metadata.get('$CM_COMMENT')
+        acquisition.title = metadata.get('$CM_TITLE')
+        acquisition.date = metadata.get('$CM_DATE')
+        acquisition.time = metadata.get('$CM_TIME')
+        acquisition.image_id = metadata.get('$CM_IMAGEID', '').lstrip(': ').strip()
+        acquisition.film_number = ELNSEMExperiment._to_float(
             metadata.get('$$SM_FILM_NUMBER')
         )
-        image_section.micron_bar = ELNSEMExperiment._to_float(
+        acquisition.micron_bar = ELNSEMExperiment._to_float(
             metadata.get('$$SM_MICRON_BAR')
         )
-        image_section.micron_marker = metadata.get('$$SM_MICRON_MARKER')
-        image_section.font_size = metadata.get('$$SM_FONT_SIZE')
+        acquisition.micron_marker = metadata.get('$$SM_MICRON_MARKER')
+        acquisition.font_size = metadata.get('$$SM_FONT_SIZE')
 
-        if image_section.micron_bar and width:
-            fov_width = image_section.micron_bar * ureg.um
-            image_section.pixel_size = fov_width / width
+        if acquisition.micron_bar and width:
+            fov_width = acquisition.micron_bar * ureg.um
+            acquisition.pixel_size = fov_width / width
 
         pixel_size_val = (
-            image_section.pixel_size.magnitude if image_section.pixel_size else None
+            acquisition.pixel_size.magnitude if acquisition.pixel_size else None
         )
         plot_section = ELNSEMExperiment._build_image_plot(bmp_path, pixel_size_val)
         if plot_section is not None:
-            image_section.plot = plot_section
+            acquisition.plot = plot_section
 
-        return image_section
+        return acquisition
 
-    def _populate_from_data_file(self, archive, logger) -> None:
+
+    def _scan_and_populate_acquisitions(self, archive, logger) -> None:
         """
-        Parse the raw txt file and populate parsed metadata into this ELN entry.
-        Existing user-provided metadata is preserved.
+        Scan the directory of this ELN entry for JEOL .txt files and matching .bmp files.
+        Populate the acquisitions list idempotently.
         """
-        if not self.data_file:
-            return
+        # 1. Resolve the directory containing this ELN schema entry
         try:
-            with archive.m_context.raw_file(self.data_file) as file:
-                mainfile = file.name
+            with archive.m_context.raw_file(archive.metadata.mainfile) as file:
+                eln_abs_path = file.name
         except Exception as exc:
-            logger.warning(f'Could not open SEM data_file "{self.data_file}": {exc}')
+            logger.warning(f'Could not resolve ELN file path: {exc}')
             return
 
-        metadata = ELNSEMExperiment._read_jeol_txt(mainfile, logger)
+        base_dir = os.path.dirname(eln_abs_path)
 
-        instrument_metadata = ELNSEMExperiment._build_instrument(metadata)
-        if self.instrument_metadata is None and instrument_metadata is not None:
-            self.instrument_metadata = instrument_metadata
+        # 2. Enumerate candidate .txt files in a stable sorted order
+        try:
+            txt_files = sorted([f for f in os.listdir(base_dir) if f.lower().endswith('.txt')])
+        except Exception as exc:
+            logger.warning(f'Error reading directory {base_dir}: {exc}')
+            return
 
-        settings = ELNSEMExperiment._build_settings(metadata)
-        if self.settings is None and settings is not None:
-            self.settings = settings
+        self.acquisitions = self.acquisitions or []
 
-        if not self.images:
-            mainfile_dir = os.path.dirname(mainfile)
-            mainfile_name = os.path.basename(mainfile)
-            bmp_name = mainfile_name.replace('.txt', '.bmp')
-            bmp_path = os.path.join(mainfile_dir, bmp_name)
-            if os.path.exists(bmp_path):
-                image_section = ELNSEMExperiment._build_image_section(
-                    metadata, bmp_name, bmp_path, archive, mainfile_dir
-                )
-                self.images = [image_section]
+        # Idempotency safeguard: use the extracted image file name as the unique key
+        existing_images = {acq.image for acq in self.acquisitions if acq.image}
+        new_acquisitions = []
+
+        for txt_name in txt_files:
+            txt_path = os.path.join(base_dir, txt_name)
+
+            # Parse metadata and verify JEOL signature
+            metadata = ELNSEMExperiment._read_jeol_txt(txt_path, logger)
+            if not any(k.startswith('$CM_') or k.startswith('$$SM_') for k in metadata.keys()):
+                continue  # Skip non-JEOL files
+
+            # Find corresponding .bmp. Policy: skip if missing
+            bmp_name = txt_name.rsplit('.', 1)[0] + '.bmp'
+            bmp_path = os.path.join(base_dir, bmp_name)
+
+            if not os.path.exists(bmp_path):
+                logger.warning(f'Missing matching .bmp for {txt_name}, skipping acquisition.')
+                continue
+
+            # Idempotency check
+            expected_image_ref = ELNSEMExperiment._raw_file_reference(bmp_path, archive, base_dir) or bmp_name
+            if expected_image_ref in existing_images:
+                continue
+
+            # Build the acquisition section and nest its specific settings
+            acquisition = ELNSEMExperiment._build_acquisition_section(
+                metadata, bmp_name, bmp_path, archive, base_dir
+            )
+            settings = ELNSEMExperiment._build_settings(metadata)
+            if settings is not None:
+                acquisition.settings = settings
+
+            new_acquisitions.append(acquisition)
+            existing_images.add(expected_image_ref)
+
+        self.acquisitions.extend(new_acquisitions)
+
+        # Populate entry-level instrument metadata from the first valid scan (if not already set)
+        if not self.instrument_metadata and txt_files:
+            for txt_name in txt_files:
+                txt_path = os.path.join(base_dir, txt_name)
+                metadata = ELNSEMExperiment._read_jeol_txt(txt_path, logger)
+                inst_meta = ELNSEMExperiment._build_instrument(metadata)
+                if inst_meta:
+                    self.instrument_metadata = inst_meta
+                    break
 
     def normalize(self, archive, logger):
-        self._populate_from_data_file(archive, logger)
+        self._scan_and_populate_acquisitions(archive, logger)
         super().normalize(archive, logger)
 
 
