@@ -24,6 +24,7 @@ configuration = config.get_plugin_entry_point(
 )
 
 m_package = SchemaPackage()
+MAX_OVERVIEW_IMAGE_PLOTS = 8
 
 
 class SEMInstrument(ArchiveSection):
@@ -338,7 +339,6 @@ class SEMAcquisition(ArchiveSection):
         description='Image preview plot.',
         a_eln=ELNAnnotation(overview=True),
     )
-
     settings = SubSection(
         section_def=SEMSettings,
         description='Instrument settings captured during this specific acquisition.',
@@ -389,7 +389,6 @@ class SEMExperiment(Measurement):
         description='Instrument metadata captured from the JEOL txt.',
         a_eln=ELNAnnotation(overview=True),
     )
-
     def normalize(self, archive, logger):  # noqa: PLR0912, PLR0915
         super().normalize(archive, logger)
 
@@ -733,6 +732,7 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
         bmp_path: str,
         archive,
         base_dir: str,
+        with_plot: bool = True,
     ) -> SEMAcquisition:
         acquisition = SEMAcquisition()
         acquisition.image = (
@@ -768,12 +768,13 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
             fov_width = acquisition.micron_bar * ureg.um
             acquisition.pixel_size = fov_width / width
 
-        pixel_size_val = (
-            acquisition.pixel_size.magnitude if acquisition.pixel_size else None
-        )
-        plot_section = ELNSEMExperiment._build_image_plot(bmp_path, pixel_size_val)
-        if plot_section is not None:
-            acquisition.plot = plot_section
+        if with_plot:
+            pixel_size_val = (
+                acquisition.pixel_size.magnitude if acquisition.pixel_size else None
+            )
+            plot_section = ELNSEMExperiment._build_image_plot(bmp_path, pixel_size_val)
+            if plot_section is not None:
+                acquisition.plot = plot_section
 
         return acquisition
 
@@ -806,6 +807,9 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
         # Idempotency safeguard: use the extracted image file name as the unique key
         existing_images = {acq.image for acq in self.acquisitions if acq.image}
         new_acquisitions = []
+        generated_plots = sum(
+            1 for acq in self.acquisitions if getattr(acq, 'plot', None) is not None
+        )
 
         for txt_name in txt_files:
             txt_path = os.path.join(base_dir, txt_name)
@@ -836,14 +840,17 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
                 continue
 
             # Build the acquisition section and nest its specific settings
+            with_plot = generated_plots < MAX_OVERVIEW_IMAGE_PLOTS
             acquisition = ELNSEMExperiment._build_acquisition_section(
-                metadata, bmp_name, bmp_path, archive, base_dir
+                metadata, bmp_name, bmp_path, archive, base_dir, with_plot=with_plot
             )
             settings = ELNSEMExperiment._build_settings(metadata)
             if settings is not None:
                 acquisition.settings = settings
 
             new_acquisitions.append(acquisition)
+            if with_plot and acquisition.plot is not None:
+                generated_plots += 1
             existing_images.add(expected_image_ref)
 
         self.acquisitions.extend(new_acquisitions)
