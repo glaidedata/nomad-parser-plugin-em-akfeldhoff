@@ -1,10 +1,11 @@
 import os
+from base64 import b64encode
+from io import BytesIO
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     pass
 
-import numpy as np
 from nomad.config import config
 from nomad.datamodel.data import ArchiveSection, EntryData
 from nomad.datamodel.metainfo.annotations import (
@@ -24,7 +25,6 @@ configuration = config.get_plugin_entry_point(
 )
 
 m_package = SchemaPackage()
-MAX_OVERVIEW_IMAGE_PLOTS = 8
 
 
 class SEMInstrument(ArchiveSection):
@@ -339,6 +339,14 @@ class SEMAcquisition(ArchiveSection):
         description='Image preview plot.',
         a_eln=ELNAnnotation(overview=True),
     )
+    gallery_figure_index = Quantity(
+        type=int,
+        description='Index of this acquisition image in the shared gallery plot list.',
+        a_eln=ELNAnnotation(
+            component=ELNComponentEnum.NumberEditQuantity,
+            overview=False,
+        ),
+    )
     settings = SubSection(
         section_def=SEMSettings,
         description='Instrument settings captured during this specific acquisition.',
@@ -389,6 +397,7 @@ class SEMExperiment(Measurement):
         description='Instrument metadata captured from the JEOL txt.',
         a_eln=ELNAnnotation(overview=True),
     )
+
     def normalize(self, archive, logger):  # noqa: PLR0912, PLR0915
         super().normalize(archive, logger)
 
@@ -681,18 +690,19 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
             return os.path.basename(file_path)
 
     @staticmethod
-    def _build_image_plot(
+    def _build_image_figure(
         file_path: str, pixel_size: float | None = None
-    ) -> SEMImagePlot | None:
+    ) -> PlotlyFigure | None:
         try:
             with Image.open(file_path) as img:
                 rgb = img.convert('RGB')
-                z = np.asarray(rgb).tolist()
+                encoded = BytesIO()
+                rgb.save(encoded, format='PNG', optimize=True)
+                data_uri = 'data:image/png;base64,' + b64encode(
+                    encoded.getvalue()
+                ).decode('ascii')
 
-            fig_section = SEMImagePlot()
             plotly_fig = PlotlyFigure()
-            plotly_fig.label = 'SEM image'
-
             dx = 1
             dy = 1
             unit_label = 'pixels'
@@ -702,7 +712,7 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
                 unit_label = 'um'
 
             plotly_fig.figure = {
-                'data': [{'type': 'image', 'z': z, 'dx': dx, 'dy': dy}],
+                'data': [{'type': 'image', 'source': data_uri, 'dx': dx, 'dy': dy}],
                 'layout': {
                     'xaxis': {
                         'visible': True,
@@ -720,8 +730,7 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
                     'width': rgb.width,
                 },
             }
-            fig_section.figures = [plotly_fig]
-            return fig_section
+            return plotly_fig
         except Exception:
             return None
 
@@ -732,7 +741,6 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
         bmp_path: str,
         archive,
         base_dir: str,
-        with_plot: bool = True,
     ) -> SEMAcquisition:
         acquisition = SEMAcquisition()
         acquisition.image = (
@@ -768,15 +776,48 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
             fov_width = acquisition.micron_bar * ureg.um
             acquisition.pixel_size = fov_width / width
 
-        if with_plot:
+        return acquisition
+
+    @staticmethod
+    def _acquisition_figure_label(acquisition: SEMAcquisition, ordinal: int) -> str:
+        for candidate in (acquisition.image_id, acquisition.title, acquisition.image):
+            if candidate:
+                return str(candidate)
+        return f'SEM image {ordinal}'
+
+    def _sync_gallery_figures(self, archive, logger) -> None:
+        self.figures = []
+
+        try:
+            with archive.m_context.raw_file(archive.metadata.mainfile) as file:
+                base_dir = os.path.dirname(file.name)
+        except Exception as exc:
+            logger.warning(f'Could not resolve ELN file path for gallery sync: {exc}')
+            for acquisition in self.acquisitions or []:
+                acquisition.gallery_figure_index = None
+            return
+
+        for idx, acquisition in enumerate(self.acquisitions or []):
+            acquisition.gallery_figure_index = None
+
+            if not acquisition.image:
+                continue
+
+            abs_image_path = os.path.join(base_dir, acquisition.image)
+            if not os.path.exists(abs_image_path):
+                continue
+
             pixel_size_val = (
                 acquisition.pixel_size.magnitude if acquisition.pixel_size else None
             )
-            plot_section = ELNSEMExperiment._build_image_plot(bmp_path, pixel_size_val)
-            if plot_section is not None:
-                acquisition.plot = plot_section
+            figure = self._build_image_figure(abs_image_path, pixel_size_val)
+            if figure is None:
+                continue
 
-        return acquisition
+            figure.index = len(self.figures)
+            figure.label = self._acquisition_figure_label(acquisition, idx + 1)
+            self.figures.append(figure)
+            acquisition.gallery_figure_index = figure.index
 
     def _scan_and_populate_acquisitions(self, archive, logger) -> None:
         """
@@ -807,9 +848,6 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
         # Idempotency safeguard: use the extracted image file name as the unique key
         existing_images = {acq.image for acq in self.acquisitions if acq.image}
         new_acquisitions = []
-        generated_plots = sum(
-            1 for acq in self.acquisitions if getattr(acq, 'plot', None) is not None
-        )
 
         for txt_name in txt_files:
             txt_path = os.path.join(base_dir, txt_name)
@@ -840,17 +878,14 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
                 continue
 
             # Build the acquisition section and nest its specific settings
-            with_plot = generated_plots < MAX_OVERVIEW_IMAGE_PLOTS
             acquisition = ELNSEMExperiment._build_acquisition_section(
-                metadata, bmp_name, bmp_path, archive, base_dir, with_plot=with_plot
+                metadata, bmp_name, bmp_path, archive, base_dir
             )
             settings = ELNSEMExperiment._build_settings(metadata)
             if settings is not None:
                 acquisition.settings = settings
 
             new_acquisitions.append(acquisition)
-            if with_plot and acquisition.plot is not None:
-                generated_plots += 1
             existing_images.add(expected_image_ref)
 
         self.acquisitions.extend(new_acquisitions)
@@ -868,6 +903,7 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
     def normalize(self, archive, logger):
         self._scan_and_populate_acquisitions(archive, logger)
         super().normalize(archive, logger)
+        self._sync_gallery_figures(archive, logger)
 
 
 m_package.__init_metainfo__()
