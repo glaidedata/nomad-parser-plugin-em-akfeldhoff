@@ -69,7 +69,7 @@ class SEMInstrument(ArchiveSection):
 
 class SEMStagePosition(ArchiveSection):
     """
-    Stage coordinates captured during acquisition.
+    Stage coordinates captured during event.
     """
 
     x = Quantity(
@@ -106,7 +106,7 @@ class SEMStagePosition(ArchiveSection):
 
 class SEMSettings(ArchiveSection):
     """
-    Instrument settings captured during acquisition (per entry).
+    Instrument settings captured during event (per entry).
     """
 
     m_def = Section(
@@ -243,7 +243,7 @@ class SEMSettings(ArchiveSection):
     )
     stage_position = SubSection(
         section_def=SEMStagePosition,
-        description='Stage position during acquisition.',
+        description='Stage position during event.',
         a_eln=ELNAnnotation(overview=False),
     )
 
@@ -261,7 +261,7 @@ class SEMImagePlot(PlotSection):
     )
 
 
-class SEMAcquisition(ArchiveSection):
+class SEMEvent(ArchiveSection):
     """
     Section representing a single SEM image and its extracted metadata.
     """
@@ -303,12 +303,12 @@ class SEMAcquisition(ArchiveSection):
     )
     date = Quantity(
         type=str,
-        description='Date of acquisition ($CM_DATE)',
+        description='Date of event ($CM_DATE)',
         a_eln=ELNAnnotation(component=ELNComponentEnum.StringEditQuantity),
     )
     time = Quantity(
         type=str,
-        description='Acquisition time ($CM_TIME).',
+        description='Event time ($CM_TIME).',
         a_eln=ELNAnnotation(
             component=ELNComponentEnum.StringEditQuantity, overview=True
         ),
@@ -341,7 +341,7 @@ class SEMAcquisition(ArchiveSection):
     )
     gallery_figure_index = Quantity(
         type=int,
-        description='Index of this acquisition image in the shared gallery plot list.',
+        description='Index of this event image in the shared gallery plot list.',
         a_eln=ELNAnnotation(
             component=ELNComponentEnum.NumberEditQuantity,
             overview=False,
@@ -349,14 +349,14 @@ class SEMAcquisition(ArchiveSection):
     )
     settings = SubSection(
         section_def=SEMSettings,
-        description='Instrument settings captured during this specific acquisition.',
+        description='Instrument settings captured during this specific event.',
         a_eln=ELNAnnotation(overview=True),
     )
 
 
 class SEMExperiment(Measurement):
     """
-    Base class for an SEM experiment containing multiple images.
+    Base class for an SEM experiment containing multiple events.
     Can be used standalone or through the ELN interface.
     """
 
@@ -385,10 +385,10 @@ class SEMExperiment(Measurement):
         ),
     )
 
-    acquisitions = SubSection(
-        section_def=SEMAcquisition,
+    events = SubSection(
+        section_def=SEMEvent,
         repeats=True,
-        label='Acquisitions',
+        label='events',
         a_eln=ELNAnnotation(overview=True),
     )
 
@@ -421,13 +421,13 @@ class SEMExperiment(Measurement):
             if self.instrument_metadata.name not in eln.instruments:
                 eln.instruments.append(self.instrument_metadata.name)
 
-        primary_acquisition = self.acquisitions[0] if self.acquisitions else None
+        primary_event = self.events[0] if self.events else None
         candidate_name = None
         for candidate in (
             getattr(self, 'name', None),
             getattr(self, 'lab_id', None),
-            getattr(primary_acquisition, 'title', None),
-            getattr(primary_acquisition, 'image', None),
+            getattr(primary_event, 'title', None),
+            getattr(primary_event, 'image', None),
         ):
             if candidate:
                 candidate_name = candidate
@@ -453,9 +453,9 @@ class SEMExperiment(Measurement):
                 archive.metadata.entry_name = candidate_name
 
         summary_bits = []
-        if primary_acquisition:
-            # Extract summary data from the nested settings of the first acquisition
-            settings = primary_acquisition.settings
+        if primary_event:
+            # Extract summary data from the nested settings of the first event
+            settings = primary_event.settings
             mag = (
                 settings.magnification
                 if settings and settings.magnification is not None
@@ -478,8 +478,8 @@ class SEMExperiment(Measurement):
                 summary_bits.append(f'{accel:g} kV')
             if wd is not None:
                 summary_bits.append(f'WD {wd:g} mm')
-            if primary_acquisition.date:
-                summary_bits.append(f'date {primary_acquisition.date}')
+            if primary_event.date:
+                summary_bits.append(f'date {primary_event.date}')
 
         if self.instrument_metadata and self.instrument_metadata.operator:
             summary_bits.append(f'operator {self.instrument_metadata.operator}')
@@ -491,8 +491,8 @@ class SEMExperiment(Measurement):
                 eln.descriptions.append(summary)
 
         # Set lab_id from image_id if missing
-        if not self.lab_id and primary_acquisition and primary_acquisition.image_id:
-            self.lab_id = primary_acquisition.image_id
+        if not self.lab_id and primary_event and primary_event.image_id:
+            self.lab_id = primary_event.image_id
 
 
 class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
@@ -767,15 +767,15 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
             return None
 
     @staticmethod
-    def _build_acquisition_section(
+    def _build_event_section(
         metadata: dict[str, str],
         bmp_name: str,
         bmp_path: str,
         archive,
         base_dir: str,
-    ) -> SEMAcquisition:
-        acquisition = SEMAcquisition()
-        acquisition.image = (
+    ) -> SEMEvent:
+        event = SEMEvent()
+        event.image = (
             ELNSEMExperiment._raw_file_reference(bmp_path, archive, base_dir)
             or bmp_name
         )
@@ -788,31 +788,27 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
             except Exception:
                 pass
 
-        acquisition.format = metadata.get('$CM_FORMAT')
-        acquisition.version = metadata.get('$CM_VERSION')
-        acquisition.comment = metadata.get('$CM_COMMENT')
-        acquisition.title = metadata.get('$CM_TITLE')
-        acquisition.date = metadata.get('$CM_DATE')
-        acquisition.time = metadata.get('$CM_TIME')
-        acquisition.image_id = metadata.get('$CM_IMAGEID', '').lstrip(': ').strip()
-        acquisition.film_number = ELNSEMExperiment._to_float(
-            metadata.get('$$SM_FILM_NUMBER')
-        )
-        acquisition.micron_bar = ELNSEMExperiment._to_float(
-            metadata.get('$$SM_MICRON_BAR')
-        )
-        acquisition.micron_marker = metadata.get('$$SM_MICRON_MARKER')
-        acquisition.font_size = metadata.get('$$SM_FONT_SIZE')
+        event.format = metadata.get('$CM_FORMAT')
+        event.version = metadata.get('$CM_VERSION')
+        event.comment = metadata.get('$CM_COMMENT')
+        event.title = metadata.get('$CM_TITLE')
+        event.date = metadata.get('$CM_DATE')
+        event.time = metadata.get('$CM_TIME')
+        event.image_id = metadata.get('$CM_IMAGEID', '').lstrip(': ').strip()
+        event.film_number = ELNSEMExperiment._to_float(metadata.get('$$SM_FILM_NUMBER'))
+        event.micron_bar = ELNSEMExperiment._to_float(metadata.get('$$SM_MICRON_BAR'))
+        event.micron_marker = metadata.get('$$SM_MICRON_MARKER')
+        event.font_size = metadata.get('$$SM_FONT_SIZE')
 
-        if acquisition.micron_bar and width:
-            fov_width = acquisition.micron_bar * ureg.um
-            acquisition.pixel_size = fov_width / width
+        if event.micron_bar and width:
+            fov_width = event.micron_bar * ureg.um
+            event.pixel_size = fov_width / width
 
-        return acquisition
+        return event
 
     @staticmethod
-    def _acquisition_figure_label(acquisition: SEMAcquisition, ordinal: int) -> str:
-        for candidate in (acquisition.image_id, acquisition.title, acquisition.image):
+    def _event_figure_label(event: SEMEvent, ordinal: int) -> str:
+        for candidate in (event.image_id, event.title, event.image):
             if candidate:
                 return str(candidate)
         return f'SEM image {ordinal}'
@@ -825,40 +821,36 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
                 base_dir = os.path.dirname(file.name)
         except Exception as exc:
             logger.warning(f'Could not resolve ELN file path for gallery sync: {exc}')
-            for acquisition in self.acquisitions or []:
-                acquisition.gallery_figure_index = None
+            for event in self.events or []:
+                event.gallery_figure_index = None
             return
 
-        for idx, acquisition in enumerate(self.acquisitions or []):
-            acquisition.gallery_figure_index = None
+        for idx, event in enumerate(self.events or []):
+            event.gallery_figure_index = None
 
-            if not acquisition.image:
+            if not event.image:
                 continue
 
-            abs_image_path = self._resolve_raw_reference(
-                acquisition.image, archive, base_dir
-            )
+            abs_image_path = self._resolve_raw_reference(event.image, archive, base_dir)
             if not abs_image_path:
                 continue
             if not os.path.exists(abs_image_path):
                 continue
 
-            pixel_size_val = (
-                acquisition.pixel_size.magnitude if acquisition.pixel_size else None
-            )
+            pixel_size_val = event.pixel_size.magnitude if event.pixel_size else None
             figure = self._build_image_figure(abs_image_path, pixel_size_val)
             if figure is None:
                 continue
 
             figure.index = len(self.figures)
-            figure.label = self._acquisition_figure_label(acquisition, idx + 1)
+            figure.label = self._event_figure_label(event, idx + 1)
             self.figures.append(figure)
-            acquisition.gallery_figure_index = figure.index
+            event.gallery_figure_index = figure.index
 
-    def _scan_and_populate_acquisitions(self, archive, logger) -> None:
+    def _scan_and_populate_events(self, archive, logger) -> None:
         """
         Scan the directory of this ELN entry for JEOL .txt files and matching .bmp files.
-        Populate the acquisitions list idempotently.
+        Populate the events list idempotently.
         """
         # 1. Resolve the directory containing this ELN schema entry
         try:
@@ -880,11 +872,11 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
             logger.warning(f'Error reading directory {scan_root}: {exc}')
             return
 
-        self.acquisitions = self.acquisitions or []
+        self.events = self.events or []
 
         # Idempotency safeguard: use the extracted image file name as the unique key
-        existing_images = {acq.image for acq in self.acquisitions if acq.image}
-        new_acquisitions = []
+        existing_images = {evnt.image for evnt in self.events if evnt.image}
+        new_events = []
 
         for txt_path in txt_files:
             txt_name = os.path.basename(txt_path)
@@ -901,9 +893,7 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
             bmp_path = os.path.join(os.path.dirname(txt_path), bmp_name)
 
             if not os.path.exists(bmp_path):
-                logger.warning(
-                    f'Missing matching .bmp for {txt_name}, skipping acquisition.'
-                )
+                logger.warning(f'Missing matching .bmp for {txt_name}, skipping event.')
                 continue
 
             # Idempotency check
@@ -916,18 +906,18 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
             if expected_image_ref in existing_images:
                 continue
 
-            # Build the acquisition section and nest its specific settings
-            acquisition = ELNSEMExperiment._build_acquisition_section(
+            # Build the event section and nest its specific settings
+            event = ELNSEMExperiment._build_event_section(
                 metadata, bmp_name, bmp_path, archive, reference_base_dir
             )
             settings = ELNSEMExperiment._build_settings(metadata)
             if settings is not None:
-                acquisition.settings = settings
+                event.settings = settings
 
-            new_acquisitions.append(acquisition)
+            new_events.append(event)
             existing_images.add(expected_image_ref)
 
-        self.acquisitions.extend(new_acquisitions)
+        self.events.extend(new_events)
 
         # Populate entry-level instrument metadata from the first valid scan (if not already set)
         if not self.instrument_metadata and txt_files:
@@ -939,7 +929,7 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
                     break
 
     def normalize(self, archive, logger):
-        self._scan_and_populate_acquisitions(archive, logger)
+        self._scan_and_populate_events(archive, logger)
         super().normalize(archive, logger)
         self._sync_gallery_figures(archive, logger)
 
