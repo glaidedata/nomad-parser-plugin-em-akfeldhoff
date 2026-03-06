@@ -105,3 +105,32 @@ def test_gallery_serialization_with_client_context(tmp_path):
     assert 'data' in serialized
     assert len(serialized['data'].get('acquisitions', [])) == 2  # Noqa: PLR2004
     assert len(serialized['data'].get('figures', [])) == 2  # Noqa: PLR2004
+
+
+def test_recursive_discovery_with_client_context(tmp_path):
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(current_dir, '..', 'data')
+    nested_dir = tmp_path / 'nested' / 'sem'
+    nested_dir.mkdir(parents=True, exist_ok=True)
+
+    for name in (
+        'HeOx-1004-sg-sps-900C-15min-polished-01.txt',
+        'HeOx-1004-sg-sps-900C-15min-polished-01.bmp',
+        'HeOx-1004-sg-sps-900C-15min-polished-02.txt',
+        'HeOx-1004-sg-sps-900C-15min-polished-02.bmp',
+    ):
+        shutil.copy(os.path.join(data_dir, name), nested_dir / name)
+
+    (tmp_path / 'dummy.archive.json').write_text('{"data":{}}\n', encoding='utf-8')
+
+    archive = EntryArchive(metadata=EntryMetadata(mainfile='dummy.archive.json'))
+    archive.m_context = ClientContext(local_dir=str(tmp_path))
+    entry = ELNSEMExperiment()
+    archive.data = entry
+
+    entry.normalize(archive, MagicMock())
+
+    assert len(entry.acquisitions) == 2  # Noqa: PLR2004
+    assert len(entry.figures) == 2  # Noqa: PLR2004
+    assert all(acq.image for acq in entry.acquisitions)
+    assert [acq.gallery_figure_index for acq in entry.acquisitions] == [0, 1]

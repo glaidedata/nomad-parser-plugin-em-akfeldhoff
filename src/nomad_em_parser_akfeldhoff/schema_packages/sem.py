@@ -525,6 +525,16 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
     )
 
     @staticmethod
+    def _context_raw_path(archive) -> str | None:
+        raw_path_attr = getattr(getattr(archive, 'm_context', None), 'raw_path', None)
+        if callable(raw_path_attr):
+            try:
+                return raw_path_attr()
+            except Exception:
+                return None
+        return raw_path_attr if isinstance(raw_path_attr, str) else None
+
+    @staticmethod
     def _read_jeol_txt(filepath, logger=None):
         data = {}
         try:
@@ -678,7 +688,7 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
 
     @staticmethod
     def _raw_file_reference(file_path: str, archive, base_dir: str) -> str | None:
-        raw_path = getattr(getattr(archive, 'm_context', None), 'raw_path', None)
+        raw_path = ELNSEMExperiment._context_raw_path(archive)
         if raw_path:
             try:
                 return os.path.relpath(file_path, raw_path)
@@ -688,6 +698,28 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
             return os.path.relpath(file_path, base_dir)
         except Exception:
             return os.path.basename(file_path)
+
+    @staticmethod
+    def _resolve_raw_reference(
+        file_reference: str, archive, base_dir: str
+    ) -> str | None:
+        if not file_reference:
+            return None
+        if os.path.isabs(file_reference):
+            return file_reference
+        raw_path = ELNSEMExperiment._context_raw_path(archive)
+        if raw_path:
+            return os.path.normpath(os.path.join(raw_path, file_reference))
+        return os.path.normpath(os.path.join(base_dir, file_reference))
+
+    @staticmethod
+    def _iter_txt_files(scan_root: str) -> list[str]:
+        txt_paths: list[str] = []
+        for root, _, files in os.walk(scan_root):
+            for name in files:
+                if name.lower().endswith('.txt'):
+                    txt_paths.append(os.path.join(root, name))
+        return sorted(txt_paths)
 
     @staticmethod
     def _build_image_figure(
@@ -803,7 +835,11 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
             if not acquisition.image:
                 continue
 
-            abs_image_path = os.path.join(base_dir, acquisition.image)
+            abs_image_path = self._resolve_raw_reference(
+                acquisition.image, archive, base_dir
+            )
+            if not abs_image_path:
+                continue
             if not os.path.exists(abs_image_path):
                 continue
 
@@ -833,14 +869,15 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
             return
 
         base_dir = os.path.dirname(eln_abs_path)
+        raw_path = ELNSEMExperiment._context_raw_path(archive)
+        scan_root = raw_path if raw_path and os.path.isdir(raw_path) else base_dir
+        reference_base_dir = scan_root
 
-        # 2. Enumerate candidate .txt files in a stable sorted order
+        # 2. Enumerate candidate .txt files recursively in a stable sorted order
         try:
-            txt_files = sorted(
-                [f for f in os.listdir(base_dir) if f.lower().endswith('.txt')]
-            )
+            txt_files = ELNSEMExperiment._iter_txt_files(scan_root)
         except Exception as exc:
-            logger.warning(f'Error reading directory {base_dir}: {exc}')
+            logger.warning(f'Error reading directory {scan_root}: {exc}')
             return
 
         self.acquisitions = self.acquisitions or []
@@ -849,8 +886,8 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
         existing_images = {acq.image for acq in self.acquisitions if acq.image}
         new_acquisitions = []
 
-        for txt_name in txt_files:
-            txt_path = os.path.join(base_dir, txt_name)
+        for txt_path in txt_files:
+            txt_name = os.path.basename(txt_path)
 
             # Parse metadata and verify JEOL signature
             metadata = ELNSEMExperiment._read_jeol_txt(txt_path, logger)
@@ -861,7 +898,7 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
 
             # Find corresponding .bmp. Policy: skip if missing
             bmp_name = txt_name.rsplit('.', 1)[0] + '.bmp'
-            bmp_path = os.path.join(base_dir, bmp_name)
+            bmp_path = os.path.join(os.path.dirname(txt_path), bmp_name)
 
             if not os.path.exists(bmp_path):
                 logger.warning(
@@ -871,7 +908,9 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
 
             # Idempotency check
             expected_image_ref = (
-                ELNSEMExperiment._raw_file_reference(bmp_path, archive, base_dir)
+                ELNSEMExperiment._raw_file_reference(
+                    bmp_path, archive, reference_base_dir
+                )
                 or bmp_name
             )
             if expected_image_ref in existing_images:
@@ -879,7 +918,7 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
 
             # Build the acquisition section and nest its specific settings
             acquisition = ELNSEMExperiment._build_acquisition_section(
-                metadata, bmp_name, bmp_path, archive, base_dir
+                metadata, bmp_name, bmp_path, archive, reference_base_dir
             )
             settings = ELNSEMExperiment._build_settings(metadata)
             if settings is not None:
@@ -892,8 +931,7 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
 
         # Populate entry-level instrument metadata from the first valid scan (if not already set)
         if not self.instrument_metadata and txt_files:
-            for txt_name in txt_files:
-                txt_path = os.path.join(base_dir, txt_name)
+            for txt_path in txt_files:
                 metadata = ELNSEMExperiment._read_jeol_txt(txt_path, logger)
                 inst_meta = ELNSEMExperiment._build_instrument(metadata)
                 if inst_meta:
