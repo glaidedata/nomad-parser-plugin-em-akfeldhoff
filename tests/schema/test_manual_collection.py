@@ -2,7 +2,6 @@ import os
 import shutil
 from unittest.mock import MagicMock
 
-import numpy as np
 from nomad.datamodel import EntryArchive, EntryMetadata
 from nomad.datamodel.context import ClientContext
 
