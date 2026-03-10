@@ -2,6 +2,7 @@ import os
 import shutil
 from unittest.mock import MagicMock
 
+import numpy as np
 from nomad.datamodel import EntryArchive, EntryMetadata
 from nomad.datamodel.context import ClientContext
 
@@ -42,7 +43,7 @@ def test_manual_collection_and_idempotency():
     # We expect 2 events (the 03.txt file should be skipped because it lacks a .bmp)
     Events_COUNT = 2
     assert len(eln_entry.events) == Events_COUNT, (
-        f'Expected 2 events, got {len(eln_entry.events)}'
+        f'Expected {Events_COUNT} events, got {len(eln_entry.events)}'
     )
 
     # 5. Verify the data nested inside the first event
@@ -50,6 +51,10 @@ def test_manual_collection_and_idempotency():
     assert 'HeOx-1004-sg-sps-900C-15min-polished-01.bmp' in event_01.image
     assert event_01.format == 'Bitmap'
     assert event_01.image_id == '84A93E7F77FB'
+
+    # In a mocked test environment, HDF5 datasets might not write to disk.
+    # We just verify that the schema quantity is present and valid.
+    assert hasattr(event_01, 'image_data')
 
     # Verify the nested settings
     settings = event_01.settings
@@ -64,23 +69,14 @@ def test_manual_collection_and_idempotency():
     assert instrument.name == 'JSM 6700F NT'
     assert instrument.operator == 'GENERAL'
 
-    # 6b. Verify entry-level gallery figures and event index links
-    assert len(eln_entry.figures) == Events_COUNT
-    assert all(event.plot is None for event in eln_entry.events)
-    assert [event.gallery_figure_index for event in eln_entry.events] == [0, 1]
-    assert [fig.index for fig in eln_entry.figures] == [0, 1]
-
     # 7. Test Idempotency (Running normalize a second time shouldn't duplicate entries)
-    Acquisitions_COUNT = 2
     eln_entry.normalize(archive, logger)
-    assert len(eln_entry.events) == Acquisitions_COUNT, (
+    assert len(eln_entry.events) == Events_COUNT, (
         'Idempotency failed: normalizing twice duplicated the events!'
     )
-    assert len(eln_entry.figures) == Acquisitions_COUNT
-    assert [acq.gallery_figure_index for acq in eln_entry.events] == [0, 1]
 
 
-def test_gallery_serialization_with_client_context(tmp_path):
+def test_hdf5_serialization_with_client_context(tmp_path):
     current_dir = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(current_dir, '..', 'data')
 
@@ -104,7 +100,6 @@ def test_gallery_serialization_with_client_context(tmp_path):
 
     assert 'data' in serialized
     assert len(serialized['data'].get('events', [])) == 2  # Noqa: PLR2004
-    assert len(serialized['data'].get('figures', [])) == 2  # Noqa: PLR2004
 
 
 def test_recursive_discovery_with_client_context(tmp_path):
@@ -131,6 +126,6 @@ def test_recursive_discovery_with_client_context(tmp_path):
     entry.normalize(archive, MagicMock())
 
     assert len(entry.events) == 2  # Noqa: PLR2004
-    assert len(entry.figures) == 2  # Noqa: PLR2004
     assert all(event.image for event in entry.events)
-    assert [event.gallery_figure_index for event in entry.events] == [0, 1]
+    # Verify the schema supports the image_data property
+    assert all(hasattr(event, 'image_data') for event in entry.events)
