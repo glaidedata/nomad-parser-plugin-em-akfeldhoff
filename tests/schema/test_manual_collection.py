@@ -5,9 +5,9 @@ from uuid import uuid4
 
 import h5py
 import numpy as np
-from nomad import files, processing
 from nomad.datamodel import EntryArchive, EntryMetadata
 from nomad.datamodel.context import ClientContext, ServerContext
+import pytest
 
 from nomad_em_parser_akfeldhoff.schema_packages.sem import ELNSEMExperiment
 
@@ -206,6 +206,9 @@ def test_events_are_ordered_by_acquisition_timestamp(tmp_path):
 
 
 def test_hdf5_serialization_with_server_context(tmp_path):
+    pytest.importorskip('zipstream')
+    from nomad import files, processing
+
     source_dir = tmp_path / 'raw_source'
     source_dir.mkdir(parents=True, exist_ok=True)
     _copy_sample_pairs(str(source_dir))
