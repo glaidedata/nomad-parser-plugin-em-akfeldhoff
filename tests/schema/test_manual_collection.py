@@ -5,9 +5,9 @@ from uuid import uuid4
 
 import h5py
 import numpy as np
+import pytest
 from nomad.datamodel import EntryArchive, EntryMetadata
 from nomad.datamodel.context import ClientContext, ServerContext
-import pytest
 
 from nomad_em_parser_akfeldhoff.schema_packages.sem import ELNSEMExperiment
 
