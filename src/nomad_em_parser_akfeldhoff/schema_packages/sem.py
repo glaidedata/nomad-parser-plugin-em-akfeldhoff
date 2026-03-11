@@ -487,7 +487,7 @@ class ELNSEMExperiment(SEMExperiment, EntryData):
 
     m_def = Section(
         label='SEM Experiment (JEOL)',
-        a_h5web=H5WebAnnotation(paths=['events/0']),
+        a_h5web=H5WebAnnotation(paths=['events']),
         a_eln=ELNAnnotation(
             overview=True,
             lane_width='800px',
@@ -708,6 +708,39 @@ class ELNSEMExperiment(SEMExperiment, EntryData):
         return sorted(txt_paths)
 
     @staticmethod
+    def _hdf5_write_context_status(archive) -> tuple[bool, str | None]:  # noqa: PLR0911
+        context = getattr(archive, 'm_context', None)
+        if context is None:
+            return False, 'archive.m_context is not available'
+
+        upload_id = getattr(context, 'upload_id', None)
+        if not upload_id:
+            return False, 'context upload_id is missing'
+
+        entry_id = getattr(getattr(archive, 'metadata', None), 'entry_id', None)
+        if not entry_id:
+            return False, 'archive.metadata.entry_id is missing'
+
+        try:
+            from nomad.files import UploadFiles
+
+            upload_files = UploadFiles.get(upload_id)
+        except Exception as exc:
+            return False, f'cannot access upload files for upload_id={upload_id}: {exc}'
+
+        if upload_files is None:
+            return False, f'upload files are not available for upload_id={upload_id}'
+
+        try:
+            upload_files.archive_hdf5_location(entry_id)
+        except Exception as exc:
+            return False, (
+                f'cannot resolve archive HDF5 location for entry_id={entry_id}: {exc}'
+            )
+
+        return True, None
+
+    @staticmethod
     def _build_event_section(
         metadata: dict[str, str],
         bmp_name: str,
@@ -747,7 +780,7 @@ class ELNSEMExperiment(SEMExperiment, EntryData):
 
         return event
 
-    def _scan_and_populate_events(self, archive, logger) -> None:
+    def _scan_and_populate_events(self, archive, logger) -> None:  # noqa: PLR0912, PLR0915
         """
         Scan the directory of this ELN entry for JEOL .txt files and matching .bmp files.
         Populate the events list idempotently.
@@ -773,6 +806,18 @@ class ELNSEMExperiment(SEMExperiment, EntryData):
             return
 
         self.events = self.events or []
+        hdf5_writable, hdf5_reason = ELNSEMExperiment._hdf5_write_context_status(
+            archive
+        )
+        if not hdf5_writable:
+            warning_message = (
+                'HDF5 image storage disabled: '
+                f'{hdf5_reason}. SEM metadata and events will still be parsed.'
+            )
+            if logger:
+                logger.warning(warning_message)
+            else:
+                print(warning_message)
 
         # Idempotency safeguard: use the extracted image file name as the unique key
         existing_images = {evnt.image for evnt in self.events if evnt.image}
@@ -816,13 +861,13 @@ class ELNSEMExperiment(SEMExperiment, EntryData):
             self.events.append(event)
             existing_images.add(expected_image_ref)
 
-            # assign the HDF5 data
-            try:
-                with Image.open(bmp_path) as img:
-                    # Convert to grayscale and cast to float64 for smooth H5Web rendering
-                    event.image_data = np.array(img.convert('L'), dtype=np.float64)
-            except Exception as exc:
-                logger.warning(f'Failed to extract image array for {bmp_name}: {exc}')
+            if hdf5_writable:
+                try:
+                    with Image.open(bmp_path) as img:
+                        # SEM intensity images are stored as full-resolution uint8 for compact HDF5.
+                        event.image_data = np.asarray(img.convert('L'), dtype=np.uint8)
+                except Exception as exc:
+                    logger.warning(f'HDF5 image write failed for {bmp_name}: {exc}')
 
         # Populate entry-level instrument metadata from the first valid scan (if not already set)
         if not self.instrument_metadata and txt_files:
