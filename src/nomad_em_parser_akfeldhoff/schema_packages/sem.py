@@ -1,20 +1,22 @@
 import os
-from base64 import b64encode
-from io import BytesIO
+from datetime import datetime
 from typing import TYPE_CHECKING
+
+import numpy as np
 
 if TYPE_CHECKING:
     pass
 
 from nomad.config import config
 from nomad.datamodel.data import ArchiveSection, EntryData
+from nomad.datamodel.hdf5 import HDF5Dataset
 from nomad.datamodel.metainfo.annotations import (
     ELNAnnotation,
     ELNComponentEnum,
+    H5WebAnnotation,
     SectionProperties,
 )
 from nomad.datamodel.metainfo.basesections import Measurement, ReadableIdentifiers
-from nomad.datamodel.metainfo.plot import PlotlyFigure, PlotSection
 from nomad.datamodel.results import ELN, Results
 from nomad.metainfo import Quantity, SchemaPackage, Section, SubSection
 from nomad.units import ureg
@@ -111,7 +113,7 @@ class SEMSettings(ArchiveSection):
 
     m_def = Section(
         a_eln=ELNAnnotation(
-            overview=True,
+            overview=False,
             lane_width='400px',
         )
     )
@@ -121,7 +123,7 @@ class SEMSettings(ArchiveSection):
         description='Display mode ($$SM_DISPLAY_MODE).',
         a_eln=ELNAnnotation(
             component=ELNComponentEnum.StringEditQuantity,
-            overview=True,
+            overview=False,
         ),
     )
     column_mode = Quantity(
@@ -129,7 +131,7 @@ class SEMSettings(ArchiveSection):
         description='Column mode ($$SM_COLUMN_MODE).',
         a_eln=ELNAnnotation(
             component=ELNComponentEnum.StringEditQuantity,
-            overview=True,
+            overview=False,
         ),
     )
     signal = Quantity(
@@ -137,7 +139,7 @@ class SEMSettings(ArchiveSection):
         description='Signal mode ($CM_SIGNAL).',
         a_eln=ELNAnnotation(
             component=ELNComponentEnum.StringEditQuantity,
-            overview=True,
+            overview=False,
         ),
     )
     acceleration_voltage = Quantity(
@@ -145,14 +147,14 @@ class SEMSettings(ArchiveSection):
         unit='kV',
         description='Acceleration Voltage ($CM_ACCEL_VOLT)',
         a_eln=ELNAnnotation(
-            component=ELNComponentEnum.NumberEditQuantity, overview=True
+            component=ELNComponentEnum.NumberEditQuantity, overview=False
         ),
     )
     magnification = Quantity(
         type=float,
         description='Magnification ($CM_MAG)',
         a_eln=ELNAnnotation(
-            component=ELNComponentEnum.NumberEditQuantity, overview=True
+            component=ELNComponentEnum.NumberEditQuantity, overview=False
         ),
     )
     working_distance = Quantity(
@@ -160,7 +162,7 @@ class SEMSettings(ArchiveSection):
         unit='mm',
         description='Working Distance ($$SM_WD)',
         a_eln=ELNAnnotation(
-            component=ELNComponentEnum.NumberEditQuantity, overview=True
+            component=ELNComponentEnum.NumberEditQuantity, overview=False
         ),
     )
     image_resolution = Quantity(
@@ -168,7 +170,7 @@ class SEMSettings(ArchiveSection):
         description='Image resolution ($CM_IMAGE_RES).',
         a_eln=ELNAnnotation(
             component=ELNComponentEnum.StringEditQuantity,
-            overview=True,
+            overview=False,
         ),
     )
     sei_detector_mode = Quantity(
@@ -248,36 +250,40 @@ class SEMSettings(ArchiveSection):
     )
 
 
-class SEMImagePlot(PlotSection):
-    """
-    Plot wrapper to render the SEM image via Plotly (data URI).
-    """
-
-    m_def = Section(
-        a_eln=ELNAnnotation(
-            overview=True,
-            lane_width='400px',
-        )
-    )
-
-
 class SEMEvent(ArchiveSection):
     """
     Section representing a single SEM image and its extracted metadata.
     """
 
     m_def = Section(
+        a_h5web=H5WebAnnotation(signal='image_data', axes=['y_axis', 'x_axis']),
         a_eln=ELNAnnotation(
-            overview=True,
+            overview=False,
             lane_width='400px',
-        )
+        ),
+    )
+
+    image_data = Quantity(
+        type=HDF5Dataset,
+        description='2D array of the SEM image stored in HDF5.',
+        a_eln=ELNAnnotation(overview=False),
+    )
+    x_axis = Quantity(
+        type=HDF5Dataset,
+        description='X-axis coordinates for the SEM image.',
+        a_eln=ELNAnnotation(overview=False),
+    )
+    y_axis = Quantity(
+        type=HDF5Dataset,
+        description='Y-axis coordinates for the SEM image.',
+        a_eln=ELNAnnotation(overview=False),
     )
 
     title = Quantity(
         type=str,
         description='Title ($CM_TITLE).',
         a_eln=ELNAnnotation(
-            component=ELNComponentEnum.StringEditQuantity, overview=True
+            component=ELNComponentEnum.StringEditQuantity, overview=False
         ),
     )
     image = Quantity(
@@ -286,7 +292,7 @@ class SEMEvent(ArchiveSection):
         a_eln=ELNAnnotation(
             component=ELNComponentEnum.FileEditQuantity,
             label='SEM Image',
-            overview=True,
+            overview=False,
         ),
         a_browser=dict(
             adaptor='RawFileAdaptor',
@@ -298,7 +304,7 @@ class SEMEvent(ArchiveSection):
         type=str,
         description='Image identifier ($CM_IMAGEID).',
         a_eln=ELNAnnotation(
-            component=ELNComponentEnum.StringEditQuantity, overview=True
+            component=ELNComponentEnum.StringEditQuantity, overview=False
         ),
     )
     date = Quantity(
@@ -310,14 +316,14 @@ class SEMEvent(ArchiveSection):
         type=str,
         description='Event time ($CM_TIME).',
         a_eln=ELNAnnotation(
-            component=ELNComponentEnum.StringEditQuantity, overview=True
+            component=ELNComponentEnum.StringEditQuantity, overview=False
         ),
     )
     comment = Quantity(
         type=str,
         description='Comment ($CM_COMMENT).',
         a_eln=ELNAnnotation(
-            component=ELNComponentEnum.StringEditQuantity, overview=True
+            component=ELNComponentEnum.StringEditQuantity, overview=False
         ),
     )
     format = Quantity(type=str, description='Image format identifier ($CM_FORMAT).')
@@ -332,25 +338,15 @@ class SEMEvent(ArchiveSection):
         type=float,
         unit='m',
         description='Physical size of one pixel. Necessary for drawing scale bars.',
-        a_eln=ELNAnnotation(component=ELNComponentEnum.NumberEditQuantity),
-    )
-    plot = SubSection(
-        section_def=SEMImagePlot,
-        description='Image preview plot.',
-        a_eln=ELNAnnotation(overview=True),
-    )
-    gallery_figure_index = Quantity(
-        type=int,
-        description='Index of this event image in the shared gallery plot list.',
         a_eln=ELNAnnotation(
-            component=ELNComponentEnum.NumberEditQuantity,
-            overview=False,
+            component=ELNComponentEnum.NumberEditQuantity, overview=False
         ),
     )
+
     settings = SubSection(
         section_def=SEMSettings,
         description='Instrument settings captured during this specific event.',
-        a_eln=ELNAnnotation(overview=True),
+        a_eln=ELNAnnotation(overview=False),
     )
 
 
@@ -389,7 +385,7 @@ class SEMExperiment(Measurement):
         section_def=SEMEvent,
         repeats=True,
         label='events',
-        a_eln=ELNAnnotation(overview=True),
+        a_eln=ELNAnnotation(overview=False),
     )
 
     instrument_metadata = SubSection(
@@ -495,13 +491,14 @@ class SEMExperiment(Measurement):
             self.lab_id = primary_event.image_id
 
 
-class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
+class ELNSEMExperiment(SEMExperiment, EntryData):
     """
     ELN-compatible SEM experiment entry that can be edited in the GUI.
     """
 
     m_def = Section(
         label='SEM Experiment (JEOL)',
+        a_h5web=H5WebAnnotation(paths=['events/0']),
         a_eln=ELNAnnotation(
             overview=True,
             lane_width='800px',
@@ -526,10 +523,18 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
 
     @staticmethod
     def _context_raw_path(archive) -> str | None:
-        raw_path_attr = getattr(getattr(archive, 'm_context', None), 'raw_path', None)
+        context = getattr(archive, 'm_context', None)
+        local_dir = getattr(context, 'local_dir', None)
+        if isinstance(local_dir, str):
+            return local_dir
+
+        raw_path_attr = getattr(context, 'raw_path', None)
         if callable(raw_path_attr):
             try:
-                return raw_path_attr()
+                raw_path = raw_path_attr()
+                if raw_path in (os.path.curdir, '.') and isinstance(local_dir, str):
+                    return local_dir
+                return raw_path
             except Exception:
                 return None
         return raw_path_attr if isinstance(raw_path_attr, str) else None
@@ -722,49 +727,61 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
         return sorted(txt_paths)
 
     @staticmethod
-    def _build_image_figure(
-        file_path: str, pixel_size: float | None = None
-    ) -> PlotlyFigure | None:
-        try:
-            with Image.open(file_path) as img:
-                rgb = img.convert('RGB')
-                encoded = BytesIO()
-                rgb.save(encoded, format='PNG', optimize=True)
-                data_uri = 'data:image/png;base64,' + b64encode(
-                    encoded.getvalue()
-                ).decode('ascii')
-
-            plotly_fig = PlotlyFigure()
-            dx = 1
-            dy = 1
-            unit_label = 'pixels'
-            if pixel_size:
-                dx = pixel_size * 1e6
-                dy = pixel_size * 1e6
-                unit_label = 'um'
-
-            plotly_fig.figure = {
-                'data': [{'type': 'image', 'source': data_uri, 'dx': dx, 'dy': dy}],
-                'layout': {
-                    'xaxis': {
-                        'visible': True,
-                        'title': {'text': unit_label},
-                        'ticks': 'outside',
-                    },
-                    'yaxis': {
-                        'visible': True,
-                        'title': {'text': unit_label},
-                        'ticks': 'outside',
-                        'scaleanchor': 'x',
-                    },
-                    'margin': {'l': 50, 'r': 0, 't': 0, 'b': 50},
-                    'height': rgb.height,
-                    'width': rgb.width,
-                },
-            }
-            return plotly_fig
-        except Exception:
+    def _parse_event_datetime(
+        date_value: str | None, time_value: str | None
+    ) -> datetime | None:
+        if not date_value or not time_value:
             return None
+
+        value = f'{date_value.strip()} {time_value.strip()}'
+        formats = (
+            '%m/%d/%Y %I:%M:%S %p',
+            '%m/%d/%Y %I:%M %p',
+            '%m/%d/%Y %H:%M:%S',
+            '%m/%d/%Y %H:%M',
+            '%Y-%m-%d %H:%M:%S',
+            '%Y-%m-%d %H:%M',
+        )
+        for fmt in formats:
+            try:
+                return datetime.strptime(value, fmt)
+            except ValueError:
+                continue
+
+        return None
+
+    @staticmethod
+    def _hdf5_write_context_status(archive) -> tuple[bool, str | None]:  # noqa: PLR0911
+        context = getattr(archive, 'm_context', None)
+        if context is None:
+            return False, 'archive.m_context is not available'
+
+        upload_id = getattr(context, 'upload_id', None)
+        if not upload_id:
+            return False, 'context upload_id is missing'
+
+        entry_id = getattr(getattr(archive, 'metadata', None), 'entry_id', None)
+        if not entry_id:
+            return False, 'archive.metadata.entry_id is missing'
+
+        try:
+            from nomad.files import UploadFiles
+
+            upload_files = UploadFiles.get(upload_id)
+        except Exception as exc:
+            return False, f'cannot access upload files for upload_id={upload_id}: {exc}'
+
+        if upload_files is None:
+            return False, f'upload files are not available for upload_id={upload_id}'
+
+        try:
+            upload_files.archive_hdf5_location(entry_id)
+        except Exception as exc:
+            return False, (
+                f'cannot resolve archive HDF5 location for entry_id={entry_id}: {exc}'
+            )
+
+        return True, None
 
     @staticmethod
     def _build_event_section(
@@ -806,48 +823,7 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
 
         return event
 
-    @staticmethod
-    def _event_figure_label(event: SEMEvent, ordinal: int) -> str:
-        for candidate in (event.image_id, event.title, event.image):
-            if candidate:
-                return str(candidate)
-        return f'SEM image {ordinal}'
-
-    def _sync_gallery_figures(self, archive, logger) -> None:
-        self.figures = []
-
-        try:
-            with archive.m_context.raw_file(archive.metadata.mainfile) as file:
-                base_dir = os.path.dirname(file.name)
-        except Exception as exc:
-            logger.warning(f'Could not resolve ELN file path for gallery sync: {exc}')
-            for event in self.events or []:
-                event.gallery_figure_index = None
-            return
-
-        for idx, event in enumerate(self.events or []):
-            event.gallery_figure_index = None
-
-            if not event.image:
-                continue
-
-            abs_image_path = self._resolve_raw_reference(event.image, archive, base_dir)
-            if not abs_image_path:
-                continue
-            if not os.path.exists(abs_image_path):
-                continue
-
-            pixel_size_val = event.pixel_size.magnitude if event.pixel_size else None
-            figure = self._build_image_figure(abs_image_path, pixel_size_val)
-            if figure is None:
-                continue
-
-            figure.index = len(self.figures)
-            figure.label = self._event_figure_label(event, idx + 1)
-            self.figures.append(figure)
-            event.gallery_figure_index = figure.index
-
-    def _scan_and_populate_events(self, archive, logger) -> None:
+    def _scan_and_populate_events(self, archive, logger) -> None:  # noqa: PLR0912, PLR0915
         """
         Scan the directory of this ELN entry for JEOL .txt files and matching .bmp files.
         Populate the events list idempotently.
@@ -865,7 +841,7 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
         scan_root = raw_path if raw_path and os.path.isdir(raw_path) else base_dir
         reference_base_dir = scan_root
 
-        # 2. Enumerate candidate .txt files recursively in a stable sorted order
+        # 2. Enumerate candidate .txt files recursively
         try:
             txt_files = ELNSEMExperiment._iter_txt_files(scan_root)
         except Exception as exc:
@@ -873,20 +849,42 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
             return
 
         self.events = self.events or []
+        hdf5_writable, hdf5_reason = ELNSEMExperiment._hdf5_write_context_status(
+            archive
+        )
+        if not hdf5_writable:
+            warning_message = (
+                'HDF5 image storage disabled: '
+                f'{hdf5_reason}. SEM metadata and events will still be parsed.'
+            )
+            if logger:
+                logger.warning(warning_message)
+            else:
+                print(warning_message)
+
+        txt_candidates: list[tuple[str, dict[str, str], datetime | None]] = []
+        for txt_path in txt_files:
+            metadata = ELNSEMExperiment._read_jeol_txt(txt_path, logger)
+            if not any(
+                key.startswith('$CM_') or key.startswith('$$SM_')
+                for key in metadata.keys()
+            ):
+                continue
+            acquisition_datetime = ELNSEMExperiment._parse_event_datetime(
+                metadata.get('$CM_DATE'), metadata.get('$CM_TIME')
+            )
+            txt_candidates.append((txt_path, metadata, acquisition_datetime))
+
+        # Deterministic event ordering by acquisition datetime; path order breaks ties.
+        txt_candidates.sort(
+            key=lambda item: (item[2] is None, item[2] or datetime.max, item[0])
+        )
 
         # Idempotency safeguard: use the extracted image file name as the unique key
         existing_images = {evnt.image for evnt in self.events if evnt.image}
-        new_events = []
 
-        for txt_path in txt_files:
+        for txt_path, metadata, _ in txt_candidates:
             txt_name = os.path.basename(txt_path)
-
-            # Parse metadata and verify JEOL signature
-            metadata = ELNSEMExperiment._read_jeol_txt(txt_path, logger)
-            if not any(
-                k.startswith('$CM_') or k.startswith('$$SM_') for k in metadata.keys()
-            ):
-                continue  # Skip non-JEOL files
 
             # Find corresponding .bmp. Policy: skip if missing
             bmp_name = txt_name.rsplit('.', 1)[0] + '.bmp'
@@ -914,15 +912,30 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
             if settings is not None:
                 event.settings = settings
 
-            new_events.append(event)
+            self.events.append(event)
             existing_images.add(expected_image_ref)
 
-        self.events.extend(new_events)
+            if hdf5_writable:
+                try:
+                    with Image.open(bmp_path) as img:
+                        # SEM intensity images are stored as full-resolution uint8 for compact HDF5.
+                        image_data = np.asarray(img.convert('L'), dtype=np.uint8)
+                        event.image_data = image_data
+                        axis_x = np.arange(image_data.shape[1], dtype=np.float32)
+                        axis_y = np.arange(image_data.shape[0], dtype=np.float32)
+                        if event.pixel_size is not None:
+                            step = event.pixel_size.to('um')
+                            event.x_axis = axis_x * step
+                            event.y_axis = axis_y * step
+                        else:
+                            event.x_axis = axis_x
+                            event.y_axis = axis_y
+                except Exception as exc:
+                    logger.warning(f'HDF5 image write failed for {bmp_name}: {exc}')
 
         # Populate entry-level instrument metadata from the first valid scan (if not already set)
-        if not self.instrument_metadata and txt_files:
-            for txt_path in txt_files:
-                metadata = ELNSEMExperiment._read_jeol_txt(txt_path, logger)
+        if not self.instrument_metadata and txt_candidates:
+            for _, metadata, _ in txt_candidates:
                 inst_meta = ELNSEMExperiment._build_instrument(metadata)
                 if inst_meta:
                     self.instrument_metadata = inst_meta
@@ -931,7 +944,6 @@ class ELNSEMExperiment(SEMExperiment, EntryData, PlotSection):
     def normalize(self, archive, logger):
         self._scan_and_populate_events(archive, logger)
         super().normalize(archive, logger)
-        self._sync_gallery_figures(archive, logger)
 
 
 m_package.__init_metainfo__()
