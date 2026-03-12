@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -255,7 +256,7 @@ class SEMEvent(ArchiveSection):
     """
 
     m_def = Section(
-        a_h5web=H5WebAnnotation(signal='image_data'),
+        a_h5web=H5WebAnnotation(signal='image_data', axes=['y_axis', 'x_axis']),
         a_eln=ELNAnnotation(
             overview=False,
             lane_width='400px',
@@ -265,6 +266,16 @@ class SEMEvent(ArchiveSection):
     image_data = Quantity(
         type=HDF5Dataset,
         description='2D array of the SEM image stored in HDF5.',
+        a_eln=ELNAnnotation(overview=False),
+    )
+    x_axis = Quantity(
+        type=HDF5Dataset,
+        description='X-axis coordinates for the SEM image.',
+        a_eln=ELNAnnotation(overview=False),
+    )
+    y_axis = Quantity(
+        type=HDF5Dataset,
+        description='Y-axis coordinates for the SEM image.',
         a_eln=ELNAnnotation(overview=False),
     )
 
@@ -512,10 +523,18 @@ class ELNSEMExperiment(SEMExperiment, EntryData):
 
     @staticmethod
     def _context_raw_path(archive) -> str | None:
-        raw_path_attr = getattr(getattr(archive, 'm_context', None), 'raw_path', None)
+        context = getattr(archive, 'm_context', None)
+        local_dir = getattr(context, 'local_dir', None)
+        if isinstance(local_dir, str):
+            return local_dir
+
+        raw_path_attr = getattr(context, 'raw_path', None)
         if callable(raw_path_attr):
             try:
-                return raw_path_attr()
+                raw_path = raw_path_attr()
+                if raw_path in (os.path.curdir, '.') and isinstance(local_dir, str):
+                    return local_dir
+                return raw_path
             except Exception:
                 return None
         return raw_path_attr if isinstance(raw_path_attr, str) else None
@@ -708,6 +727,63 @@ class ELNSEMExperiment(SEMExperiment, EntryData):
         return sorted(txt_paths)
 
     @staticmethod
+    def _parse_event_datetime(
+        date_value: str | None, time_value: str | None
+    ) -> datetime | None:
+        if not date_value or not time_value:
+            return None
+
+        value = f'{date_value.strip()} {time_value.strip()}'
+        formats = (
+            '%m/%d/%Y %I:%M:%S %p',
+            '%m/%d/%Y %I:%M %p',
+            '%m/%d/%Y %H:%M:%S',
+            '%m/%d/%Y %H:%M',
+            '%Y-%m-%d %H:%M:%S',
+            '%Y-%m-%d %H:%M',
+        )
+        for fmt in formats:
+            try:
+                return datetime.strptime(value, fmt)
+            except ValueError:
+                continue
+
+        return None
+
+    @staticmethod
+    def _hdf5_write_context_status(archive) -> tuple[bool, str | None]:  # noqa: PLR0911
+        context = getattr(archive, 'm_context', None)
+        if context is None:
+            return False, 'archive.m_context is not available'
+
+        upload_id = getattr(context, 'upload_id', None)
+        if not upload_id:
+            return False, 'context upload_id is missing'
+
+        entry_id = getattr(getattr(archive, 'metadata', None), 'entry_id', None)
+        if not entry_id:
+            return False, 'archive.metadata.entry_id is missing'
+
+        try:
+            from nomad.files import UploadFiles
+
+            upload_files = UploadFiles.get(upload_id)
+        except Exception as exc:
+            return False, f'cannot access upload files for upload_id={upload_id}: {exc}'
+
+        if upload_files is None:
+            return False, f'upload files are not available for upload_id={upload_id}'
+
+        try:
+            upload_files.archive_hdf5_location(entry_id)
+        except Exception as exc:
+            return False, (
+                f'cannot resolve archive HDF5 location for entry_id={entry_id}: {exc}'
+            )
+
+        return True, None
+
+    @staticmethod
     def _build_event_section(
         metadata: dict[str, str],
         bmp_name: str,
@@ -747,7 +823,7 @@ class ELNSEMExperiment(SEMExperiment, EntryData):
 
         return event
 
-    def _scan_and_populate_events(self, archive, logger) -> None:
+    def _scan_and_populate_events(self, archive, logger) -> None:  # noqa: PLR0912, PLR0915
         """
         Scan the directory of this ELN entry for JEOL .txt files and matching .bmp files.
         Populate the events list idempotently.
@@ -765,7 +841,7 @@ class ELNSEMExperiment(SEMExperiment, EntryData):
         scan_root = raw_path if raw_path and os.path.isdir(raw_path) else base_dir
         reference_base_dir = scan_root
 
-        # 2. Enumerate candidate .txt files recursively in a stable sorted order
+        # 2. Enumerate candidate .txt files recursively
         try:
             txt_files = ELNSEMExperiment._iter_txt_files(scan_root)
         except Exception as exc:
@@ -773,19 +849,42 @@ class ELNSEMExperiment(SEMExperiment, EntryData):
             return
 
         self.events = self.events or []
+        hdf5_writable, hdf5_reason = ELNSEMExperiment._hdf5_write_context_status(
+            archive
+        )
+        if not hdf5_writable:
+            warning_message = (
+                'HDF5 image storage disabled: '
+                f'{hdf5_reason}. SEM metadata and events will still be parsed.'
+            )
+            if logger:
+                logger.warning(warning_message)
+            else:
+                print(warning_message)
+
+        txt_candidates: list[tuple[str, dict[str, str], datetime | None]] = []
+        for txt_path in txt_files:
+            metadata = ELNSEMExperiment._read_jeol_txt(txt_path, logger)
+            if not any(
+                key.startswith('$CM_') or key.startswith('$$SM_')
+                for key in metadata.keys()
+            ):
+                continue
+            acquisition_datetime = ELNSEMExperiment._parse_event_datetime(
+                metadata.get('$CM_DATE'), metadata.get('$CM_TIME')
+            )
+            txt_candidates.append((txt_path, metadata, acquisition_datetime))
+
+        # Deterministic event ordering by acquisition datetime; path order breaks ties.
+        txt_candidates.sort(
+            key=lambda item: (item[2] is None, item[2] or datetime.max, item[0])
+        )
 
         # Idempotency safeguard: use the extracted image file name as the unique key
         existing_images = {evnt.image for evnt in self.events if evnt.image}
 
-        for txt_path in txt_files:
+        for txt_path, metadata, _ in txt_candidates:
             txt_name = os.path.basename(txt_path)
-
-            # Parse metadata and verify JEOL signature
-            metadata = ELNSEMExperiment._read_jeol_txt(txt_path, logger)
-            if not any(
-                k.startswith('$CM_') or k.startswith('$$SM_') for k in metadata.keys()
-            ):
-                continue  # Skip non-JEOL files
 
             # Find corresponding .bmp. Policy: skip if missing
             bmp_name = txt_name.rsplit('.', 1)[0] + '.bmp'
@@ -816,18 +915,27 @@ class ELNSEMExperiment(SEMExperiment, EntryData):
             self.events.append(event)
             existing_images.add(expected_image_ref)
 
-            # assign the HDF5 data
-            try:
-                with Image.open(bmp_path) as img:
-                    # Convert to grayscale and cast to float64 for smooth H5Web rendering
-                    event.image_data = np.array(img.convert('L'), dtype=np.float64)
-            except Exception as exc:
-                logger.warning(f'Failed to extract image array for {bmp_name}: {exc}')
+            if hdf5_writable:
+                try:
+                    with Image.open(bmp_path) as img:
+                        # SEM intensity images are stored as full-resolution uint8 for compact HDF5.
+                        image_data = np.asarray(img.convert('L'), dtype=np.uint8)
+                        event.image_data = image_data
+                        axis_x = np.arange(image_data.shape[1], dtype=np.float32)
+                        axis_y = np.arange(image_data.shape[0], dtype=np.float32)
+                        if event.pixel_size is not None:
+                            step = event.pixel_size.to('um')
+                            event.x_axis = axis_x * step
+                            event.y_axis = axis_y * step
+                        else:
+                            event.x_axis = axis_x
+                            event.y_axis = axis_y
+                except Exception as exc:
+                    logger.warning(f'HDF5 image write failed for {bmp_name}: {exc}')
 
         # Populate entry-level instrument metadata from the first valid scan (if not already set)
-        if not self.instrument_metadata and txt_files:
-            for txt_path in txt_files:
-                metadata = ELNSEMExperiment._read_jeol_txt(txt_path, logger)
+        if not self.instrument_metadata and txt_candidates:
+            for _, metadata, _ in txt_candidates:
                 inst_meta = ELNSEMExperiment._build_instrument(metadata)
                 if inst_meta:
                     self.instrument_metadata = inst_meta
