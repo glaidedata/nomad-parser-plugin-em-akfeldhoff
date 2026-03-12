@@ -727,6 +727,15 @@ class ELNSEMExperiment(SEMExperiment, EntryData):
         return sorted(txt_paths)
 
     @staticmethod
+    def _iter_bmp_files(scan_root: str) -> list[str]:
+        bmp_paths: list[str] = []
+        for root, _, files in os.walk(scan_root):
+            for name in files:
+                if name.lower().endswith('.bmp'):
+                    bmp_paths.append(os.path.join(root, name))
+        return sorted(bmp_paths)
+
+    @staticmethod
     def _parse_event_datetime(
         date_value: str | None, time_value: str | None
     ) -> datetime | None:
@@ -937,6 +946,46 @@ class ELNSEMExperiment(SEMExperiment, EntryData):
                             event.y_axis = axis_y
                 except Exception as exc:
                     logger.warning(f'HDF5 image write failed for {bmp_name}: {exc}')
+
+        all_bmp_paths = ELNSEMExperiment._iter_bmp_files(scan_root)
+        for bmp_path in all_bmp_paths:
+            bmp_name = os.path.basename(bmp_path)
+
+            expected_image_ref = (
+                ELNSEMExperiment._raw_file_reference(
+                    bmp_path, archive, reference_base_dir
+                )
+                or bmp_name
+            )
+
+            # If this image was already processed by a .txt file, skip it
+            if expected_image_ref in existing_images:
+                continue
+
+            logger.warning(
+                f'Found orphaned .bmp file without .txt metadata: {bmp_name}'
+            )
+
+            # Create a minimal event with just the image
+            event = SEMEvent()
+            event.image = expected_image_ref
+            event.title = bmp_name  # Use the filename as a fallback title
+
+            self.events.append(event)
+            existing_images.add(expected_image_ref)
+
+            if hdf5_writable:
+                try:
+                    with Image.open(bmp_path) as img:
+                        image_data = np.asarray(img.convert('L'), dtype=np.uint8)
+                        event.image_data = image_data
+                        # Note: No physical x_axis/y_axis because we don't have pixel_size!
+                        event.x_axis = np.arange(image_data.shape[1], dtype=np.float32)
+                        event.y_axis = np.arange(image_data.shape[0], dtype=np.float32)
+                except Exception as exc:
+                    logger.warning(
+                        f'HDF5 image write failed for orphaned {bmp_name}: {exc}'
+                    )
 
         # Populate entry-level instrument metadata from the first valid scan (if not already set)
         if not self.instrument_metadata and txt_candidates:

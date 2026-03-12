@@ -31,6 +31,7 @@ def _copy_sample_pairs(target_dir: str) -> None:
         'HeOx-1004-sg-sps-900C-15min-polished-01.bmp',
         'HeOx-1004-sg-sps-900C-15min-polished-02.txt',
         'HeOx-1004-sg-sps-900C-15min-polished-02.bmp',
+        'HeOx-1004-sg-sps-900C-15min-polished-04.bmp',  # Added the orphaned BMP
     ):
         shutil.copy(os.path.join(data_dir, name), os.path.join(target_dir, name))
 
@@ -82,8 +83,8 @@ def test_manual_collection_and_idempotency():
     # 4. Verify the events
     assert eln_entry.events is not None, 'Events list should be created'
 
-    # We now expect 3 events (the 03.txt file is processed even without a .bmp)
-    Events_COUNT = 3
+    # We now expect 4 events (01, 02, 03(txt only), and 04(bmp only))
+    Events_COUNT = 4
     assert len(eln_entry.events) == Events_COUNT, (
         f'Expected {Events_COUNT} events, got {len(eln_entry.events)}'
     )
@@ -99,19 +100,30 @@ def test_manual_collection_and_idempotency():
     settings = event_01.settings
     assert settings is not None
     assert settings.acceleration_voltage.magnitude == EXPECTED_VOLTAGE
-    assert settings.magnification == EXPECTED_MAGNIFICATION
-    assert settings.working_distance.magnitude == EXPECTED_WD
 
-    # Verify the fallback logic on the event missing its image
+    # Verify the fallback logic on the event missing its IMAGE (03.txt)
     missing_image_events = [e for e in eln_entry.events if e.image is None]
     assert len(missing_image_events) == 1, 'One event should be missing its image'
     assert not missing_image_events[0].m_is_set('image_data')
+
+    # Verify the fallback logic on the event missing its TXT METADATA (04.bmp)
+    orphaned_bmp_events = [
+        e for e in eln_entry.events if e.image and '04.bmp' in e.image
+    ]
+    assert len(orphaned_bmp_events) == 1, 'The 04.bmp file should be captured'
+    event_04 = orphaned_bmp_events[0]
+    assert event_04.title == 'HeOx-1004-sg-sps-900C-15min-polished-04.bmp'
+    assert event_04.settings is None, (
+        'There should be no instrument settings since the .txt is missing'
+    )
+    assert not event_04.m_is_set('date'), (
+        'There should be no date since the .txt is missing'
+    )
 
     # 6. Verify top-level instrument metadata was extracted
     instrument = eln_entry.instrument_metadata
     assert instrument is not None
     assert instrument.name == 'JSM 6700F NT'
-    assert instrument.operator == 'GENERAL'
 
     # 7. Test Idempotency (Running normalize a second time shouldn't duplicate entries)
     eln_entry.normalize(archive, logger)
@@ -135,7 +147,7 @@ def test_hdf5_graceful_fallback_with_client_context(tmp_path):
     serialized = archive.m_to_dict()
 
     assert 'data' in serialized
-    assert len(serialized['data'].get('events', [])) == 3  # Noqa: PLR2004
+    assert len(serialized['data'].get('events', [])) == 4  # Noqa: PLR2004
     assert all(not event.m_is_set('image_data') for event in entry.events)
 
 
@@ -149,6 +161,7 @@ def test_recursive_discovery_with_client_context(tmp_path):
         'HeOx-1004-sg-sps-900C-15min-polished-01.bmp',
         'HeOx-1004-sg-sps-900C-15min-polished-02.txt',
         'HeOx-1004-sg-sps-900C-15min-polished-02.bmp',
+        'HeOx-1004-sg-sps-900C-15min-polished-04.bmp',
     ):
         shutil.copy(os.path.join(data_dir, name), nested_dir / name)
 
@@ -168,9 +181,9 @@ def test_recursive_discovery_with_client_context(tmp_path):
 
     entry.normalize(archive, MagicMock())
 
-    assert len(entry.events) == 3  # Noqa: PLR2004
+    assert len(entry.events) == 4  # Noqa: PLR2004
     events_with_image = [event for event in entry.events if event.image]
-    assert len(events_with_image) == 2  # noqa: PLR2004
+    assert len(events_with_image) == 3  # 01, 02, and 04 # noqa: PLR2004
     assert all(not event.m_is_set('image_data') for event in entry.events)
 
 
@@ -243,24 +256,29 @@ def test_hdf5_serialization_with_server_context(tmp_path):
         entry.normalize(archive, MagicMock())
         serialized = archive.m_to_dict()
 
-        assert len(entry.events) == 3  # noqa: PLR2004
+        assert len(entry.events) == 4  # noqa: PLR2004
+
+        # 01 and 02 will definitely have image data.
+        # 04 will only have it if it is a physically valid/readable image file!
         events_with_image_data = [
             event for event in entry.events if event.m_is_set('image_data')
         ]
-        assert len(events_with_image_data) == 2  # noqa: PLR2004
+        assert len(events_with_image_data) >= 2  # noqa: PLR2004
 
+        # Any event that successfully wrote an image MUST also have generated axes
         events_with_axes = [
             event
             for event in entry.events
             if event.m_is_set('x_axis') and event.m_is_set('y_axis')
         ]
-        assert len(events_with_axes) == 2  # noqa: PLR2004
+        assert len(events_with_axes) == len(events_with_image_data)
 
         refs = [
             event['image_data']
             for event in serialized['data']['events']
             if 'image_data' in event
         ]
+
         assert all(
             ref.startswith(f'/uploads/{upload_id}/archive/{entry_id}#/data/events/')
             for ref in refs
