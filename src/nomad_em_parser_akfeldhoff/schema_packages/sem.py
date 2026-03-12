@@ -792,13 +792,13 @@ class ELNSEMExperiment(SEMExperiment, EntryData):
         base_dir: str,
     ) -> SEMEvent:
         event = SEMEvent()
-        event.image = (
-            ELNSEMExperiment._raw_file_reference(bmp_path, archive, base_dir)
-            or bmp_name
-        )
 
         width = None
         if os.path.exists(bmp_path):
+            event.image = (
+                ELNSEMExperiment._raw_file_reference(bmp_path, archive, base_dir)
+                or bmp_name
+            )
             try:
                 with Image.open(bmp_path) as img:
                     width, _ = img.size
@@ -886,21 +886,26 @@ class ELNSEMExperiment(SEMExperiment, EntryData):
         for txt_path, metadata, _ in txt_candidates:
             txt_name = os.path.basename(txt_path)
 
-            # Find corresponding .bmp. Policy: skip if missing
+            # Find corresponding .bmp.
             bmp_name = txt_name.rsplit('.', 1)[0] + '.bmp'
             bmp_path = os.path.join(os.path.dirname(txt_path), bmp_name)
+            bmp_exists = os.path.exists(bmp_path)
 
-            if not os.path.exists(bmp_path):
-                logger.warning(f'Missing matching .bmp for {txt_name}, skipping event.')
-                continue
+            if not bmp_exists:
+                logger.warning(
+                    f'Missing matching .bmp for {txt_name}, saving metadata without image.'
+                )
 
             # Idempotency check
-            expected_image_ref = (
-                ELNSEMExperiment._raw_file_reference(
-                    bmp_path, archive, reference_base_dir
+            expected_image_ref = txt_name
+            if bmp_exists:
+                expected_image_ref = (
+                    ELNSEMExperiment._raw_file_reference(
+                        bmp_path, archive, reference_base_dir
+                    )
+                    or bmp_name
                 )
-                or bmp_name
-            )
+
             if expected_image_ref in existing_images:
                 continue
 
@@ -915,7 +920,7 @@ class ELNSEMExperiment(SEMExperiment, EntryData):
             self.events.append(event)
             existing_images.add(expected_image_ref)
 
-            if hdf5_writable:
+            if hdf5_writable and bmp_exists:
                 try:
                     with Image.open(bmp_path) as img:
                         # SEM intensity images are stored as full-resolution uint8 for compact HDF5.
